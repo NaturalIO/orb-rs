@@ -7,7 +7,7 @@ Orb is an abstraction layer for writing runtime-agnostic async Rust code, allowi
 
 We took the name `Orb` because it gets around :)
 
-[English](README.md) | [中文](README-zh.md)
+[English](README.md) | [中文](https://github.com/NaturalIO/orb-rs/blob/master/README-zh.md)
 
 ## Features
 
