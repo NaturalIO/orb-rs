@@ -1,0 +1,29 @@
+[package]
+name = "orb-tokio"
+version = "0.1.0"
+edition = "2024"
+authors = ["plan <frostyplanet@gmail.com>"]
+categories = ["concurrency", "network-programming"]
+repository = "https://github.com/NaturalIO/orb"
+documentation = "https://docs.rs/orb-tokio"
+keywords = ["networking", "async", "io", "runtime"]
+readme = "../README.md"
+license = "MIT"
+description = """
+orb interface adaptor for tokio ecology.
+Orb is an abstraction for writing runtime agnostic async code.
+"""
+
+[dependencies]
+tokio = { version = "1", features = ["net", "time", "rt", "rt-multi-thread"] }
+orb = { path = "../", version = "0.1" }
+
+[dev-dependencies]
+futures = "0.3"
+orb-test-utils = { path = "../test-utils" }
+rstest = "0"
+
+[package.metadata.docs.rs]
+all-features = true
+# enable features in the documentation
+rustdoc-args = ["--cfg", "docsrs"]

@@ -1,4 +1,10 @@
-/target
-Cargo.lock
-tags
+target
+**/*.rs.bk
 *.sw*
+tags
+Cargo.lock
+*/Makefile.env
+pkgs/
+tmp_pkg_build/
+*.deb
+*.tar.gz
