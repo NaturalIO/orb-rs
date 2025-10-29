@@ -33,8 +33,6 @@ use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::time::Duration;
 
-mod buffer;
-pub use buffer::AllocateBuf;
 mod buf_io;
 pub use buf_io::{AsyncBufRead, AsyncBufStream, AsyncBufWrite, AsyncRead, AsyncWrite};
 
