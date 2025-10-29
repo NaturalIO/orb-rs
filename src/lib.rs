@@ -9,7 +9,7 @@
 //! - [`time`] - Traits for time-related operations like sleeping and intervals
 //! - [`utils`] - Utility types and functions
 //!
-//! At top level `AsyncRuntime` trait will combine all the core capabilities, including
+//! At top level [AsyncRuntime] trait will combine all the capabilities, including
 //! [`AsyncExec`], [`AsyncIO`], and [`AsyncTime`].
 //!
 //! You can write your own trait by inheriting AsyncRuntime or any other trait, to provide extra

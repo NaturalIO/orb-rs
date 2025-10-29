@@ -44,8 +44,11 @@ In your `Cargo.toml`:
 
 ```toml
 [dependencies]
+# when you write runtime agnostic codes
 orb = "0"
+# when you setup as end-user
 orb-tokio = "0"
+# or
 orb-smol = "0"
 ```
 
@@ -53,8 +56,8 @@ There's a global trait `AsyncRuntime` that combines all features at the crate le
 
 There are some variants of the `new()` function, also refer to the documentation in the sub-crates:
 
-- [orb-tokio](https://crates.io/crates/orb-tokio) - For the Tokio runtime
-- [orb-smol](https://crates.io/crates/orb-smol) - For the Smol runtime
+- [orb-tokio](https://docs.rs/orb-tokio) - For the Tokio runtime
+- [orb-smol](https://docs.rs/orb-smol) - For the Smol runtime
 
 ## License
 
