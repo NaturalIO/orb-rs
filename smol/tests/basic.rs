@@ -1,8 +1,8 @@
+use async_executor::Executor;
 use orb_smol::SmolRT;
 use orb_test_utils::*;
-use std::sync::Arc;
 use rstest::*;
-use async_executor::Executor;
+use std::sync::Arc;
 
 #[fixture]
 fn setup() {

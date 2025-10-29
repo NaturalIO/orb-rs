@@ -41,5 +41,3 @@ impl AllocateBuf for Vec<u8> {
         return Some(self);
     }
 }
-
-

@@ -1,8 +1,11 @@
 use async_executor::Executor;
 use async_io::{Async, Timer};
+use futures_lite::future::block_on;
+use futures_lite::stream::StreamExt;
 use orb::io::{AsyncFd, AsyncIO};
 use orb::runtime::{AsyncExec, AsyncJoinHandle};
 use orb::time::{AsyncTime, TimeInterval};
+use std::fmt;
 use std::future::Future;
 use std::io;
 use std::net::SocketAddr;
@@ -14,23 +17,15 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::*;
-use std::fmt;
 use std::time::{Duration, Instant};
-use futures_lite::stream::StreamExt;
-use futures_lite::future::block_on;
 
 #[derive(Clone)]
 pub struct SmolRT(Option<Arc<Executor<'static>>>);
 
 impl fmt::Debug for SmolRT {
-
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.0.is_some() {
-            write!(f, "smol")
-        } else {
-            write!(f, "smol(global)")
-        }
+        if self.0.is_some() { write!(f, "smol") } else { write!(f, "smol(global)") }
     }
 }
 
@@ -54,9 +49,7 @@ impl AsyncIO for SmolRT {
     type AsyncFd<T: AsRawFd + AsFd + Send + Sync + 'static> = SmolFD<T>;
 
     #[inline(always)]
-    async fn connect_tcp(
-        addr: &SocketAddr,
-    ) -> io::Result<Self::AsyncFd<TcpStream>> {
+    async fn connect_tcp(addr: &SocketAddr) -> io::Result<Self::AsyncFd<TcpStream>> {
         let _addr = addr.clone();
         let stream = Async::<TcpStream>::connect(_addr).await?;
         // into_inner will not change back to blocking
@@ -64,9 +57,7 @@ impl AsyncIO for SmolRT {
     }
 
     #[inline(always)]
-    async fn connect_unix(
-        addr: &PathBuf,
-    ) -> io::Result<Self::AsyncFd<UnixStream>> {
+    async fn connect_unix(addr: &PathBuf) -> io::Result<Self::AsyncFd<UnixStream>> {
         let _addr = addr.clone();
         let stream = Async::<UnixStream>::connect(_addr).await?;
         // into_inner will not change back to blocking
@@ -107,7 +98,6 @@ impl AsyncTime for SmolRT {
 pub struct SmolJoinHandle<T>(async_executor::Task<T>);
 
 impl<T: Send + 'static> AsyncJoinHandle<T> for SmolJoinHandle<T> {
-
     #[inline]
     async fn join(self) -> Result<T, ()> {
         Ok(self.0.await)

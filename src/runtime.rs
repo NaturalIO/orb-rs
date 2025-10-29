@@ -9,7 +9,6 @@
 
 use std::future::Future;
 
-
 /// Defines the execution-related interface we used from async runtime
 pub trait AsyncExec: Send + Sync + 'static {
     /// Spawn a task in the background, returning a handle to await its result
@@ -63,7 +62,7 @@ impl<FT: std::ops::Deref<Target = T> + Send + Sync + 'static, T: AsyncExec> Asyn
 /// A handle that can be used to await the result of a spawned task.
 pub trait AsyncJoinHandle<T: Send + 'static>: Send + 'static {
     /// Detaches the task, allowing it to run in the background without waiting for its result.
-    fn join(self) -> impl Future<Output=Result<T, ()>> + Send;
+    fn join(self) -> impl Future<Output = Result<T, ()>> + Send;
 
     fn detach(self);
 }

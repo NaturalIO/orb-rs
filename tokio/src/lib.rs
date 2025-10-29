@@ -1,6 +1,7 @@
-pub use orb::runtime::{AsyncExec, AsyncJoinHandle};
 use orb::io::{AsyncFd, AsyncIO};
+pub use orb::runtime::{AsyncExec, AsyncJoinHandle};
 use orb::time::{AsyncTime, TimeInterval};
+use std::fmt;
 use std::future::Future;
 use std::io;
 use std::net::SocketAddr;
@@ -12,8 +13,7 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::task::*;
 use std::time::{Duration, Instant};
-use std::fmt;
-use tokio::runtime::{Handle, Runtime, Builder};
+use tokio::runtime::{Builder, Handle, Runtime};
 
 /// The main struct for tokio runtime IO, assign this type to AsyncIO trait when used.
 pub enum TokioRT {
@@ -21,20 +21,17 @@ pub enum TokioRT {
     Handle(Handle),
 }
 
-
 impl fmt::Debug for TokioRT {
-
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Runtime(_)=>write!(f, "tokio(rt)"),
-            Self::Handle(_)=>write!(f, "tokio(handle)")
+            Self::Runtime(_) => write!(f, "tokio(rt)"),
+            Self::Handle(_) => write!(f, "tokio(handle)"),
         }
     }
 }
 
 impl TokioRT {
-
     /// Capture a runtime
     #[inline]
     pub fn new_with_runtime(rt: Runtime) -> Self {
@@ -70,18 +67,14 @@ impl AsyncIO for TokioRT {
     type AsyncFd<T: AsRawFd + AsFd + Send + Sync + 'static> = TokioFD<T>;
 
     #[inline(always)]
-    async fn connect_tcp(
-        addr: &SocketAddr,
-    ) -> io::Result<Self::AsyncFd<TcpStream>> {
+    async fn connect_tcp(addr: &SocketAddr) -> io::Result<Self::AsyncFd<TcpStream>> {
         let stream = tokio::net::TcpStream::connect(addr).await?;
         // into_std will not change back to blocking
         Self::to_async_fd_rw(stream.into_std()?)
     }
 
     #[inline(always)]
-    async fn connect_unix(
-        addr: &PathBuf,
-    ) -> io::Result<Self::AsyncFd<UnixStream>> {
+    async fn connect_unix(addr: &PathBuf) -> io::Result<Self::AsyncFd<UnixStream>> {
         let stream = tokio::net::UnixStream::connect(addr).await?;
         // into_std will not change back to blocking
         Self::to_async_fd_rw(stream.into_std()?)
@@ -129,10 +122,10 @@ impl AsyncExec for TokioRT {
         R: Send + 'static,
     {
         match self {
-            Self::Runtime(s)=>{
+            Self::Runtime(s) => {
                 return TokioJoinHandle(s.spawn(f));
             }
-            Self::Handle(s)=>{
+            Self::Handle(s) => {
                 return TokioJoinHandle(s.spawn(f));
             }
         }
@@ -146,10 +139,10 @@ impl AsyncExec for TokioRT {
         R: Send + 'static,
     {
         match self {
-            Self::Runtime(s)=>{
+            Self::Runtime(s) => {
                 s.spawn(f);
             }
-            Self::Handle(s)=>{
+            Self::Handle(s) => {
                 s.spawn(f);
             }
         }
@@ -163,10 +156,10 @@ impl AsyncExec for TokioRT {
         R: Send + 'static,
     {
         match self {
-            Self::Runtime(s)=>{
+            Self::Runtime(s) => {
                 return s.block_on(f);
             }
-            Self::Handle(s)=>{
+            Self::Handle(s) => {
                 return s.block_on(f);
             }
         }
@@ -212,17 +205,15 @@ impl<T: AsRawFd + AsFd + Send + Sync + 'static> Deref for TokioFD<T> {
     }
 }
 
-
 /// A wrapper around tokio's JoinHandle that implements AsyncJoinHandle
 pub struct TokioJoinHandle<T>(tokio::task::JoinHandle<T>);
 
 impl<T: Send + 'static> AsyncJoinHandle<T> for TokioJoinHandle<T> {
-
     #[inline]
     async fn join(self) -> Result<T, ()> {
         match self.0.await {
-            Ok(r)=>Ok(r),
-            Err(_)=>Err(()),
+            Ok(r) => Ok(r),
+            Err(_) => Err(()),
         }
     }
 
@@ -232,4 +223,3 @@ impl<T: Send + 'static> AsyncJoinHandle<T> for TokioJoinHandle<T> {
         // when the handle is dropped
     }
 }
-

@@ -1,9 +1,9 @@
+use crate::utils::Cancellable;
+use futures_lite::stream::Stream;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
-use crate::utils::Cancellable;
-use futures_lite::stream::Stream;
 
 /// Defines the time-related interface we used from async runtime
 pub trait AsyncTime: Send + Sync + 'static {
@@ -35,7 +35,6 @@ impl<F: std::ops::Deref<Target = T> + Send + Sync + 'static, T: AsyncTime> Async
         T::tick(d)
     }
 }
-
 
 /// Defines the universal interval/ticker trait
 pub trait TimeInterval: Unpin + Send {
@@ -74,9 +73,7 @@ impl<T: TimeInterval> Stream for IntervalStream<T> {
     type Item = Instant;
 
     fn poll_next(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        unsafe {
-            Pin::new_unchecked(&mut self.interval).poll_tick(ctx).map(Some)
-        }
+        unsafe { Pin::new_unchecked(&mut self.interval).poll_tick(ctx).map(Some) }
     }
 }
 
@@ -95,8 +92,6 @@ impl<T: TimeInterval> Future for TickFuture<T> {
     type Output = Instant;
 
     fn poll(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-        unsafe {
-            Pin::new_unchecked(&mut self.interval).poll_tick(ctx)
-        }
+        unsafe { Pin::new_unchecked(&mut self.interval).poll_tick(ctx) }
     }
 }

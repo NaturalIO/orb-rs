@@ -1,10 +1,13 @@
-use std::time::Duration;
 use captains_log::{logfn, recipe, ConsoleTarget, Level};
 use orb::prelude::*;
+use std::time::Duration;
 
 // Initialize logging in the test utility crate
 pub fn init_logger() {
-    recipe::console_logger(ConsoleTarget::Stdout, Level::Debug).test().build().expect("Failed to initialize logger");
+    recipe::console_logger(ConsoleTarget::Stdout, Level::Debug)
+        .test()
+        .build()
+        .expect("Failed to initialize logger");
 }
 
 /// Test basic runtime functionality
@@ -19,7 +22,8 @@ where
         // Test spawn and join
         let handle = rt.spawn(async {
             RT::sleep(Duration::from_secs(2)).await;
-            100 });
+            100
+        });
         println!("sleep");
         RT::sleep(Duration::from_secs(1)).await;
         println!("sleep done");
@@ -30,7 +34,6 @@ where
         42
     });
     assert_eq!(result, 42);
-
 }
 
 /// Test time-related functionality
@@ -105,7 +108,6 @@ where
     RT: AsyncRuntime + std::fmt::Debug,
 {
     rt.block_on(async {
-
         let start = std::time::Instant::now();
         let ticker = RT::tick(Duration::from_millis(50));
         let mut stream = ticker.into_stream();

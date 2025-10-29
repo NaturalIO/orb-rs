@@ -1,6 +1,8 @@
 //! I/O utilities
 
+use super::time::AsyncTime;
 use std::future::Future;
+use std::io;
 use std::net::SocketAddr;
 use std::net::TcpStream;
 use std::ops::Deref;
@@ -8,8 +10,6 @@ use std::os::fd::{AsFd, AsRawFd};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::time::Duration;
-use std::io;
-use super::time::AsyncTime;
 
 mod buffer;
 pub use buffer::AllocateBuf;
@@ -46,23 +46,21 @@ pub trait AsyncIO: Send + Sync + 'static {
     #[inline]
     fn connect_tcp_timeout(
         addr: &SocketAddr, timeout: Duration,
-    ) -> impl Future<Output=io::Result<Self::AsyncFd<TcpStream>>> + Send
-        where Self: AsyncTime
+    ) -> impl Future<Output = io::Result<Self::AsyncFd<TcpStream>>> + Send
+    where
+        Self: AsyncTime,
     {
-        async move {
-            io_with_timeout!(Self, timeout, Self::connect_tcp(addr))
-        }
+        async move { io_with_timeout!(Self, timeout, Self::connect_tcp(addr)) }
     }
 
     #[inline]
     fn connect_unix_timeout(
         addr: &PathBuf, timeout: Duration,
-    ) -> impl Future<Output=io::Result<Self::AsyncFd<UnixStream>>>
-        where Self: AsyncTime
+    ) -> impl Future<Output = io::Result<Self::AsyncFd<UnixStream>>>
+    where
+        Self: AsyncTime,
     {
-        async move {
-            io_with_timeout!(Self, timeout, Self::connect_unix(addr))
-        }
+        async move { io_with_timeout!(Self, timeout, Self::connect_unix(addr)) }
     }
 
     /// Required to set_nonblocking first
@@ -99,7 +97,7 @@ impl<F: std::ops::Deref<Target = IO> + Send + Sync + 'static, IO: AsyncIO> Async
     }
 
     fn connect_unix(
-        addr: &PathBuf
+        addr: &PathBuf,
     ) -> impl Future<Output = io::Result<Self::AsyncFd<UnixStream>>> + Send {
         IO::connect_unix(addr)
     }

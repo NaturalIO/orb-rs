@@ -1,9 +1,9 @@
-use orb_tokio::TokioRT;
 use orb_test_utils::*;
+use orb_tokio::TokioRT;
 use rstest::*;
 
 #[fixture]
-fn setup () {
+fn setup() {
     init_logger();
 }
 
