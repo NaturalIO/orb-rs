@@ -1,0 +1,13 @@
+[package]
+name = "orb"
+version = "0.0.1"
+edition = "2024"
+authors = ["plan <frostyplanet@gmail.com>"]
+categories = ["concurrency", "network-programming"]
+documentation = "https://doc.rs/orb"
+license = "MIT"
+description = """
+Provides abstration to write code compatible to different async runtimes
+"""
+
+[dependencies]
