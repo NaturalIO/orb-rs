@@ -1,13 +1,21 @@
+[workspace]
+members = ["tokio", "smol", "test-utils"]
+
 [package]
 name = "orb"
-version = "0.0.1"
+version = "0.1.0"
 edition = "2024"
 authors = ["plan <frostyplanet@gmail.com>"]
 categories = ["concurrency", "network-programming"]
-documentation = "https://doc.rs/orb"
+documentation = "https://docs.rs/orb"
+repository = "https://github.com/NaturalIO/orb"
+keywords = ["networking", "async", "io", "runtime"]
 license = "MIT"
 description = """
-Provides abstration to write code compatible to different async runtimes
+An abstraction for writing runtime agnostic async code.
+Orb provides interfaces to adapt different async runtimes like smol and tokio.
 """
 
 [dependencies]
+pin-project-lite = "0.2"
+futures-lite = "2.6"
