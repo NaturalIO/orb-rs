@@ -1,3 +1,20 @@
+//! # Orb Tokio Runtime
+//!
+//! This crate provides a Tokio-based implementation of the Orb async runtime traits.
+//! It allows users to leverage Tokio's powerful async runtime with the unified Orb interface.
+//!
+//! The main type provided is [`TokioRT`], which implements the core runtime functionality.
+//!
+//! See the [main Orb documentation](https://github.com/NaturalIO/orb) for more information.
+//!
+//! ## Usage
+//!
+//! ```rust
+//! use orb_tokio::TokioRT;
+//!
+//! let rt = TokioRT::new_multi_thread(4);
+//! ```
+
 use orb::io::{AsyncFd, AsyncIO};
 pub use orb::runtime::{AsyncExec, AsyncJoinHandle};
 use orb::time::{AsyncTime, TimeInterval};

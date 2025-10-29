@@ -1,14 +1,23 @@
+//! Utility types and functions for async operations.
+//!
+//! This module provides helper types and functions that support the
+//! other modules in the crate.
+
 use pin_project_lite::pin_project;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
 pin_project! {
-    /// Cancellable accepts a param `future` for I/O,
-    /// abort the I/O waiting when `cancel_future` returns.
+    /// A cancellable future that can be aborted when another future completes.
     ///
-    /// The `cancel_future` can be timer or notification channel recv(), the return arg can be
-    /// anything, but ignored
+    /// This struct allows you to race two futures and cancel one when the
+    /// other completes. It's primarily used internally to implement timeouts.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `F` - The main future that provides the primary result
+    /// * `C` - The cancellation future that, when completed, aborts the main future
     pub struct Cancellable<F, C> {
         #[pin]
         future: F,
@@ -18,6 +27,16 @@ pin_project! {
 }
 
 impl<F: Future + Send, C: Future + Send> Cancellable<F, C> {
+    /// Create a new cancellable future.
+    ///
+    /// # Parameters
+    ///
+    /// * `future` - The main future to execute
+    /// * `cancel_future` - The future that, when completed, cancels the main future
+    ///
+    /// # Returns
+    ///
+    /// A new cancellable future
     pub fn new(future: F, cancel_future: C) -> Self {
         Self { future, cancel_future }
     }

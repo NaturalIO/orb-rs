@@ -1,3 +1,39 @@
+//! # Smol Runtime adapter for Orb framework
+//!
+//! This crate provides a Smol-based implementation of the Orb async runtime traits.
+//! It allows users to leverage Smol's lightweight async runtime with the unified Orb interface.
+//!
+//! The main type provided is [`SmolRT`], which implements the core runtime functionality.
+//!
+//! See the [Orb crate](https://docs.rs/orb) for more information.
+//!
+//! ## Features
+//!
+//! - `global`: Enables the global executor feature, which allows using a global executor
+//!   instead of providing your own executor instance.
+//!
+//! ## Usage
+//!
+//! With a custom executor:
+//!
+//! ```rust
+//! use orb_smol::SmolRT;
+//! use std::sync::Arc;
+//! use async_executor::Executor;
+//!
+//! let executor = Arc::new(Executor::new());
+//! let rt = SmolRT::new(executor);
+//! ```
+//!
+//! With the global executor (requires the `global` feature):
+//!
+//! ```rust
+//! use orb_smol::SmolRT;
+//!
+//! #[cfg(feature = "global")]
+//! let rt = SmolRT::new_global();
+//! ```
+
 use async_executor::Executor;
 use async_io::{Async, Timer};
 use futures_lite::future::block_on;

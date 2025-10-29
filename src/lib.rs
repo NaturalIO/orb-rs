@@ -1,9 +1,44 @@
+#![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(docsrs, allow(unused_attributes))]
+#![doc = include_str!("../README.md")]
+
+//! ## Modules
+//!
+//! - [`runtime`] - Traits for task spawn, join and block_on.
+//! - [`io`] - Traits for asynchronous I/O operations, and buffered I/O wrapper.
+//! - [`time`] - Traits for time-related operations like sleeping and intervals
+//! - [`utils`] - Utility types and functions
+//!
+//! At top level `AsyncRuntime` trait will combine all the core capabilities, including
+//! [`AsyncExec`], [`AsyncIO`], and [`AsyncTime`].
+//!
+//! You can write your own trait by inheriting AsyncRuntime or any other trait, to provide extra
+//! functions along with the runtime object.
+//! There's an blanket trait to auto impl AsyncRuntime on anything that is `Deref<Target>` to an AsyncRuntime.
+//!
+//! ``` rust
+//! pub trait AsyncRuntime: AsyncExec + AsyncIO + AsyncTime {}
+//!
+//! impl<F: std::ops::Deref<Target = T> + Send + Sync + 'static, T: AsyncRuntime> AsyncRuntime for F {}
+//! ```
+//! Simimlar blanket trait can be found on other sub traits.
+//!
+//! ## Important Notes
+//!
+//! When working with spawned tasks, be aware that some runtimes (like smol) will
+//! cancel the future if you drop the task handle without explicitly detaching it.
+//! If you want a task to continue running in the background, you must call
+//! [`AsyncJoinHandle::detach`] rather than just dropping the handle.
+
 pub mod io;
 pub mod runtime;
 pub mod time;
 pub mod utils;
 
 /// Re-export all the traits you need
+///
+/// This module contains all the essential traits needed to work with Orb.
+/// Importing this prelude is the recommended way to use Orb in your code.
 pub mod prelude {
     pub use crate::AsyncRuntime;
     pub use crate::io::AsyncFd;
@@ -17,6 +52,13 @@ pub mod prelude {
 
 use prelude::*;
 
+/// A marker trait that combines all the core async runtime capabilities,
+/// including [`AsyncExec`], [`AsyncIO`], and [`AsyncTime`]. It serves as a convenient
+/// way to specify that a type provides all the core async runtime functionality.
+///
+/// You can write your own trait by inheriting AsyncRuntime or any other trait, to provide extra
+/// functions along with the runtime object.
+/// There's an blanket trait to auto impl AsyncRuntime on anything that is `Deref<Target>` to an AsyncRuntime.
 pub trait AsyncRuntime: AsyncExec + AsyncIO + AsyncTime {}
 
 impl<F: std::ops::Deref<Target = T> + Send + Sync + 'static, T: AsyncRuntime> AsyncRuntime for F {}
