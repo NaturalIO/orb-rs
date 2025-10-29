@@ -12,6 +12,7 @@ fn setup() {
 #[cfg(feature = "global")]
 #[rstest]
 fn test_smol_rt_with_global(setup: ()) {
+    let _ = setup; // Explicitly ignore the fixture value
     let rt = SmolRT::new_global();
     test_runtime_basics(&rt);
     test_time_functionality(&rt);
@@ -20,6 +21,7 @@ fn test_smol_rt_with_global(setup: ()) {
 #[cfg(feature = "global")]
 #[rstest]
 fn test_smol_tick_functionality_global(setup: ()) {
+    let _ = setup; // Explicitly ignore the fixture value
     let rt = SmolRT::new_global();
     test_tick_async_wait(&rt);
     test_multiple_tick_instances(&rt);
@@ -29,6 +31,7 @@ fn test_smol_tick_functionality_global(setup: ()) {
 
 #[rstest]
 fn test_smol_rt_with_executor(setup: ()) {
+    let _ = setup; // Explicitly ignore the fixture value
     // Test with executor
     let rt = SmolRT::new(Arc::new(Executor::new()));
     test_runtime_basics(&rt);
@@ -37,6 +40,7 @@ fn test_smol_rt_with_executor(setup: ()) {
 
 #[rstest]
 fn test_smol_tick_functionality(setup: ()) {
+    let _ = setup; // Explicitly ignore the fixture value
     // Test tick functionality with executor
     let rt = SmolRT::new(Arc::new(Executor::new()));
     test_tick_async_wait(&rt);

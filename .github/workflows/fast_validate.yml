@@ -18,8 +18,5 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: test-tokio
-      run: make test-tokio
-
-    - name: test-smol
-      run: make test-smol
+    - name: test-all
+      run: make test-all

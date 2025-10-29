@@ -11,6 +11,7 @@ fn setup() {
 #[case(TokioRT::new_multi_thread(2))]
 #[case(TokioRT::new_current_thread())]
 fn test_tokio_rt(setup: (), #[case] rt: TokioRT) {
+    let _ = setup; // Explicitly ignore the fixture value
     test_runtime_basics(&rt);
     test_time_functionality(&rt);
 }
@@ -19,6 +20,7 @@ fn test_tokio_rt(setup: (), #[case] rt: TokioRT) {
 #[case(TokioRT::new_multi_thread(2))]
 #[case(TokioRT::new_current_thread())]
 fn test_tokio_tick_functionality(setup: (), #[case] rt: TokioRT) {
+    let _ = setup; // Explicitly ignore the fixture value
     // Test tick functionality with multi-threaded runtime
     test_tick_async_wait(&rt);
     test_multiple_tick_instances(&rt);

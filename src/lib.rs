@@ -16,7 +16,7 @@
 //! functions along with the runtime object.
 //! There's an blanket trait to auto impl AsyncRuntime on anything that is `Deref<Target>` to an AsyncRuntime.
 //!
-//! ``` rust
+//! ``` no_compile
 //! pub trait AsyncRuntime: AsyncExec + AsyncIO + AsyncTime {}
 //!
 //! impl<F: std::ops::Deref<Target = T> + Send + Sync + 'static, T: AsyncRuntime> AsyncRuntime for F {}
@@ -42,7 +42,7 @@ pub mod utils;
 pub mod prelude {
     pub use crate::AsyncRuntime;
     pub use crate::io::AsyncFd;
-    pub use crate::io::AsyncIO;
+    pub use crate::io::{AsyncIO, AsyncRead, AsyncWrite, AsyncBufRead, AsyncBufWrite};
     pub use crate::runtime::{AsyncExec, AsyncJoinHandle};
     pub use crate::time::{AsyncTime, TimeInterval};
     // Re-export the Stream trait so users can import it

@@ -15,7 +15,7 @@ fmt: init
 
 .PHONY: test-all
 test-all: test-tokio test-smol
-	echo run all tests
+	cargo test -- --nocapture --test-threads=1
 
 .PHONY: test-tokio
 test-tokio: init
