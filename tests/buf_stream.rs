@@ -1,5 +1,5 @@
-use orb::prelude::*;
 use orb::io::AsyncBufStream;
+use orb::prelude::*;
 use rand::{Rng, RngCore};
 use std::future::Future;
 use std::io;
