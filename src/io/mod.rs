@@ -22,7 +22,6 @@
 //! - What we do here is just wrap any std blocking function with async poller when they are
 //! readable or writeable, similar with `async-io`, as a light-weight implementation.
 
-use super::time::AsyncTime;
 use std::future::Future;
 use std::io;
 use std::net::SocketAddr;
@@ -31,28 +30,9 @@ use std::ops::Deref;
 use std::os::fd::{AsFd, AsRawFd};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
-use std::time::Duration;
 
 mod buf_io;
 pub use buf_io::{AsyncBufRead, AsyncBufStream, AsyncBufWrite, AsyncRead, AsyncWrite};
-
-/// Helper macro to convert timeout errors to IO errors.
-///
-/// This macro is used internally to convert the `()` error returned by
-/// timeout functions into a proper `io::Error` with `TimedOut` kind.
-macro_rules! io_with_timeout {
-    ($IO: path, $timeout: expr, $f: expr) => {{
-        if $timeout == Duration::from_secs(0) {
-            $f.await
-        } else {
-            match <$IO as AsyncTime>::timeout($timeout, $f).await {
-                Ok(Ok(r)) => Ok(r),
-                Ok(Err(e)) => Err(e),
-                Err(_) => Err(io::ErrorKind::TimedOut.into()),
-            }
-        }
-    }};
-}
 
 /// Trait for async I/O operations.
 ///
@@ -113,58 +93,6 @@ pub trait AsyncIO: Send + Sync + 'static {
     fn connect_unix(
         addr: &PathBuf,
     ) -> impl Future<Output = io::Result<Self::AsyncFd<UnixStream>>> + Send;
-
-    /// Connect to a TCP address with a timeout.
-    ///
-    ///
-    ///
-    /// This method is similar to [`connect_tcp`](Self::connect_tcp) but
-    /// includes a timeout that will cancel the connection attempt if it
-    /// takes too long.
-    ///
-    /// # Parameters
-    ///
-    /// * `addr` - The socket address to connect to
-    /// * `timeout` - The maximum time to wait for the connection
-    ///
-    /// # Returns
-    ///
-    /// A future that resolves to a `Result` containing either the connected
-    /// async file descriptor or an I/O error (including timeout errors).
-    #[inline]
-    fn connect_tcp_timeout(
-        addr: &SocketAddr, timeout: Duration,
-    ) -> impl Future<Output = io::Result<Self::AsyncFd<TcpStream>>> + Send
-    where
-        Self: AsyncTime,
-    {
-        async move { io_with_timeout!(Self, timeout, Self::connect_tcp(addr)) }
-    }
-
-    /// Connect to a Unix socket with a timeout.
-    ///
-    /// This method is similar to [`connect_unix`](Self::connect_unix) but
-    /// includes a timeout that will cancel the connection attempt if it
-    /// takes too long.
-    ///
-    /// # Parameters
-    ///
-    /// * `addr` - The path to the Unix socket
-    /// * `timeout` - The maximum time to wait for the connection
-    ///
-    /// # Returns
-    ///
-    /// A future that resolves to a `Result` containing either the connected
-    /// async file descriptor or an I/O error (including timeout errors).
-    #[inline]
-    fn connect_unix_timeout(
-        addr: &PathBuf, timeout: Duration,
-    ) -> impl Future<Output = io::Result<Self::AsyncFd<UnixStream>>>
-    where
-        Self: AsyncTime,
-    {
-        async move { io_with_timeout!(Self, timeout, Self::connect_unix(addr)) }
-    }
 
     /// Wrap a readable file object to an async handle
     ///
