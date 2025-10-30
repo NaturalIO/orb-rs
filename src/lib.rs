@@ -6,6 +6,7 @@
 //!
 //! - [`runtime`] - Traits for task spawn, join and block_on.
 //! - [`io`] - Traits for asynchronous I/O operations, and buffered I/O wrapper.
+//! - [`net`] - Wrapper types for networking, and a "unify" type for tcp + unix stream.
 //! - [`time`] - Traits for time-related operations like sleeping and intervals
 //! - [`utils`] - Utility types and functions
 //!

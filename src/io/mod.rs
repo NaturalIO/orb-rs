@@ -54,7 +54,7 @@ pub trait AsyncIO: Send + Sync + 'static {
     ///
     /// # NOTE
     ///
-    /// This is for runtime implementation, for user should use [TcpStream::<IO>::connect()](crate::net::TcpStream) instead**.
+    /// This is for runtime implementation, for user should use [`TcpStream::<IO>::connect()`](crate::net::TcpStream) instead**.
     ///
     /// This method attempts to establish a TCP connection to the specified
     /// address, returning an async file descriptor that can be used for
@@ -76,7 +76,7 @@ pub trait AsyncIO: Send + Sync + 'static {
     ///
     /// # NOTE
     ///
-    /// This is for runtime implementation, for user should use [UnixStream::<IO>::connect()](crate::net::UnixStream) instead**.
+    /// This is for runtime implementation, for user should use [`UnixStream::<IO>::connect()`](crate::net::UnixStream) instead**.
     ///
     /// This method attempts to establish a Unix socket connection to the
     /// specified path, returning an async file descriptor that can be used
@@ -94,7 +94,7 @@ pub trait AsyncIO: Send + Sync + 'static {
         addr: &PathBuf,
     ) -> impl Future<Output = io::Result<Self::AsyncFd<UnixStream>>> + Send;
 
-    /// Wrap a readable file object to an async handle
+    /// Wrap a readable file object as an async handle
     ///
     /// The file descriptor will subscribe for read
     /// to the runtime poller
@@ -116,7 +116,7 @@ pub trait AsyncIO: Send + Sync + 'static {
         fd: T,
     ) -> io::Result<Self::AsyncFd<T>>;
 
-    /// Wrap a readable/writable file object to an async handle.
+    /// Wrap a readable/writable file object as an async handle.
     ///
     /// The file descriptor will subscribe for read + write
     /// to the runtime poller

@@ -1,7 +1,11 @@
 //! TCP and Unix domain socket listener implementations.
 //!
-//! This module provides async listener abstractions for TCP and Unix domain sockets,
-//! implementing the [`AsyncListener`] trait for both types.
+//! This module provides async listener abstractions for TCP and Unix domain sockets.
+//!
+//! Additionally, we provides:
+//! - [UnifyAddr] type for smart address parsing, and trait [ResolveAddr]
+//! to replace std [ToSocketAddrs](https://doc.rust-lang.org/std/net/trait.ToSocketAddrs.html),
+//! - [UnifyStream] + [UnixListener] to provide consistent interface for both socket types.
 
 use super::{AsyncFd, AsyncIO, AsyncRead, AsyncWrite};
 use crate::time::AsyncTime;
