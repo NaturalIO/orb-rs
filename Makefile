@@ -13,8 +13,8 @@ init: git-hooks
 fmt: init
 	cargo fmt
 
-.PHONY: test-all
-test-all: test-tokio test-smol
+.PHONY: test
+test: test-tokio test-smol
 	cargo test -- --nocapture --test-threads=1
 
 .PHONY: test-tokio
