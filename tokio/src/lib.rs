@@ -165,6 +165,15 @@ impl AsyncExec for TokioRT {
         }
     }
 
+    #[inline(always)]
+    fn spawn_blocking<F, R>(f: F) -> impl AsyncJoinHandle<R>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        TokioJoinHandle(tokio::task::spawn_blocking(f))
+    }
+
     /// Run a future to completion on the runtime
     #[inline]
     fn block_on<F, R>(&self, f: F) -> R
@@ -225,7 +234,7 @@ impl<T: AsRawFd + AsFd + Send + Sync + 'static> Deref for TokioFD<T> {
 /// A wrapper around tokio's JoinHandle that implements AsyncJoinHandle
 pub struct TokioJoinHandle<T>(tokio::task::JoinHandle<T>);
 
-impl<T: Send + 'static> AsyncJoinHandle<T> for TokioJoinHandle<T> {
+impl<T: Send> AsyncJoinHandle<T> for TokioJoinHandle<T> {
     #[inline]
     async fn join(self) -> Result<T, ()> {
         match self.0.await {

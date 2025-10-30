@@ -55,6 +55,7 @@ use std::sync::Arc;
 use std::task::*;
 use std::time::{Duration, Instant};
 
+/// The SmolRT implements AsyncRuntime trait
 #[derive(Clone)]
 pub struct SmolRT(Option<Arc<Executor<'static>>>);
 
@@ -174,6 +175,15 @@ impl AsyncExec for SmolRT {
         R: Send + 'static,
     {
         self.spawn(f).detach();
+    }
+
+    #[inline]
+    fn spawn_blocking<F, R>(f: F) -> impl AsyncJoinHandle<R>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        SmolJoinHandle(blocking::unblock(f))
     }
 
     /// Run a future to completion on the runtime

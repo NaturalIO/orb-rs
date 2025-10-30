@@ -20,6 +20,7 @@ orb = { path = "../", version=">=0.1" }
 async-io = "2.6"
 async-executor = "1"
 smol = {version="2", optional=true}
+blocking = "1.6"
 
 [dev-dependencies]
 orb-test-utils = { path = "../test-utils" }

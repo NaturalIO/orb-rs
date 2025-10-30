@@ -29,7 +29,7 @@ use std::future::Future;
 ///             // Do some async work
 ///             42
 ///         });
-///         
+///
 ///         // Wait for the result
 ///         let result = handle.join().await.unwrap();
 ///         assert_eq!(result, 42);
@@ -80,6 +80,31 @@ pub trait AsyncExec: Send + Sync + 'static {
         F: Future<Output = R> + Send + 'static,
         R: Send + 'static;
 
+    /// Run blocking code in a background thread pool, and return an async join handle
+    ///
+    /// # NOTE:
+    ///
+    /// This method spawn with threal pool provide by runtime in current context, globally.
+    /// In order for ResolveAddr job which does not have a AsyncExec handle, so this method is static.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `F` - The future type to spawn
+    /// * `R` - The return type of the future
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - The future to spawn
+    ///
+    /// # Returns
+    ///
+    /// A handle that implements [`AsyncJoinHandle`] and can be used to await
+    /// the call result.
+    fn spawn_blocking<F, R>(f: F) -> impl AsyncJoinHandle<R>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static;
+
     /// Run a future to completion on the runtime.
     ///
     /// This method blocks the current thread until the provided future
@@ -123,6 +148,15 @@ impl<FT: std::ops::Deref<Target = T> + Send + Sync + 'static, T: AsyncExec> Asyn
     }
 
     #[inline(always)]
+    fn spawn_blocking<F, R>(f: F) -> impl AsyncJoinHandle<R>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        T::spawn_blocking(f)
+    }
+
+    #[inline(always)]
     fn block_on<F, R>(&self, f: F) -> R
     where
         F: Future<Output = R> + Send,
@@ -140,7 +174,7 @@ impl<FT: std::ops::Deref<Target = T> + Send + Sync + 'static, T: AsyncExec> Asyn
 /// # Type Parameters
 ///
 /// * `T` - The return type of the task
-pub trait AsyncJoinHandle<T: Send + 'static>: Send + 'static {
+pub trait AsyncJoinHandle<T: Send>: Send {
     /// Wait for the task to complete and return its result.
     ///
     /// This method returns a future that resolves to either the task's
