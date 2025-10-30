@@ -1,9 +1,10 @@
 use captains_log::{logfn, recipe, ConsoleTarget, Level};
-use orb::io::{AsyncRead, AsyncWrite};
-use orb::net::{TcpListener, TcpStream, UnixListener, UnixStream};
 use orb::prelude::*;
 use orb::time::TimeInterval;
 use std::time::Duration;
+
+mod net;
+pub use net::*;
 
 // Initialize logging in the test utility crate
 pub fn init_logger() {
@@ -143,130 +144,4 @@ where
             assert!(elapsed >= Duration::from_millis(30 * i as u64));
         }
     });
-}
-
-/// Test TCP client-server communication
-#[logfn]
-pub fn test_tcp_client_server<RT>(rt: &RT)
-where
-    RT: AsyncRuntime + std::fmt::Debug,
-{
-    rt.block_on(async {
-        // Create a shared variable to store the server address
-
-        // Use port 0 to let the OS choose a random available port
-        let mut listener =
-            TcpListener::<RT>::bind("127.0.0.1:0").expect("Failed to create TCP listener");
-
-        // Get the actual port assigned by the OS
-        let server_addr = listener.local_addr().expect("Failed to get local address");
-
-        // Store the address in the shared variable
-
-        // Start server in a separate task
-        let server_handle = rt.spawn(async move {
-            // Accept one connection
-            let mut stream = listener.accept().await.expect("Failed to accept connection");
-
-            // Read data from client
-            let mut buffer = [0; 32];
-            let n = stream.read(&mut buffer).await.expect("Failed to read from client");
-            let received = String::from_utf8_lossy(&buffer[..n]);
-
-            // Verify received data
-            assert_eq!(received, "Hello from client!");
-
-            // Send response to client
-            let response = "Hello from server!";
-            stream.write(response.as_bytes()).await.expect("Failed to write to client");
-
-            // Return success
-            true
-        });
-
-        // Connect as client
-        let mut client_stream = TcpStream::<RT>::connect(&server_addr.parse().unwrap())
-            .await
-            .expect("Failed to connect to server");
-
-        // Send data to server
-        let message = "Hello from client!";
-        client_stream.write(message.as_bytes()).await.expect("Failed to write to server");
-
-        // Read response from server
-        let mut buffer = [0; 32];
-        let n = client_stream.read(&mut buffer).await.expect("Failed to read from server");
-        let received = String::from_utf8_lossy(&buffer[..n]);
-
-        // Verify received data
-        assert_eq!(received, "Hello from server!");
-
-        // Wait for server to complete
-        let server_result = server_handle.join().await.expect("Server task failed");
-        assert!(server_result);
-    });
-}
-
-/// Test Unix client-server communication
-#[logfn]
-pub fn test_unix_client_server<RT>(rt: &RT)
-where
-    RT: AsyncRuntime + std::fmt::Debug,
-{
-    // Clean up any existing socket file
-    let _ = std::fs::remove_file("/tmp/test_socket_client_server");
-
-    rt.block_on(async {
-        // Start server in a separate task
-        let server_handle = rt.spawn(async {
-            let mut listener = UnixListener::<RT>::bind("/tmp/test_socket_client_server")
-                .expect("Failed to create Unix listener");
-
-            // Accept one connection
-            let mut stream = listener.accept().await.expect("Failed to accept connection");
-
-            // Read data from client
-            let mut buffer = [0; 32];
-            let n = stream.read(&mut buffer).await.expect("Failed to read from client");
-            let received = String::from_utf8_lossy(&buffer[..n]);
-
-            // Verify received data
-            assert_eq!(received, "Hello from client!");
-
-            // Send response to client
-            let response = "Hello from server!";
-            stream.write(response.as_bytes()).await.expect("Failed to write to client");
-
-            // Return success
-            true
-        });
-
-        // Give server time to start
-        RT::sleep(Duration::from_millis(100)).await;
-
-        // Connect as client
-        let mut client_stream =
-            UnixStream::<RT>::connect(&std::path::PathBuf::from("/tmp/test_socket_client_server"))
-                .await
-                .expect("Failed to connect to server");
-
-        // Send data to server
-        let message = "Hello from client!";
-        client_stream.write(message.as_bytes()).await.expect("Failed to write to server");
-
-        // Read response from server
-        let mut buffer = [0; 32];
-        let n = client_stream.read(&mut buffer).await.expect("Failed to read from server");
-        let received = String::from_utf8_lossy(&buffer[..n]);
-
-        // Verify received data
-        assert_eq!(received, "Hello from server!");
-
-        // Wait for server to complete
-        let server_result = server_handle.join().await.expect("Server task failed");
-        assert!(server_result);
-    });
-
-    // Clean up the socket file after test
-    let _ = std::fs::remove_file("/tmp/test_socket_client_server");
 }
