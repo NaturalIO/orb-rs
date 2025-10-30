@@ -34,6 +34,26 @@ use std::path::PathBuf;
 mod buf_io;
 pub use buf_io::{AsyncBufRead, AsyncBufStream, AsyncBufWrite, AsyncRead, AsyncWrite};
 
+/// Helper macro to convert timeout errors to IO errors.
+///
+/// This macro is used internally to convert the `()` error returned by
+/// timeout functions into a proper `io::Error` with `TimedOut` kind.
+#[macro_export]
+macro_rules! io_with_timeout {
+    ($IO: path, $timeout: expr, $f: expr) => {{
+        if $timeout == Duration::from_secs(0) {
+            $f.await
+        } else {
+            // rust 2018 macro will replace crate name after export
+            match <$IO as crate::time::AsyncTime>::timeout($timeout, $f).await {
+                Ok(Ok(r)) => Ok(r),
+                Ok(Err(e)) => Err(e),
+                Err(_) => Err(io::ErrorKind::TimedOut.into()),
+            }
+        }
+    }};
+}
+
 /// Trait for async I/O operations.
 ///
 /// This trait defines the interface for performing asynchronous I/O operations

@@ -18,23 +18,6 @@ use std::net::{
 };
 use std::time::Duration;
 
-/// Helper macro to convert timeout errors to IO errors.
-///
-/// This macro is used internally to convert the `()` error returned by
-/// timeout functions into a proper `io::Error` with `TimedOut` kind.
-macro_rules! io_with_timeout {
-    ($IO: path, $timeout: expr, $f: expr) => {{
-        if $timeout == Duration::from_secs(0) {
-            $f.await
-        } else {
-            match <$IO as AsyncTime>::timeout($timeout, $f).await {
-                Ok(Ok(r)) => Ok(r),
-                Ok(Err(e)) => Err(e),
-                Err(_) => Err(io::ErrorKind::TimedOut.into()),
-            }
-        }
-    }};
-}
 use std::os::fd::{AsRawFd, FromRawFd, RawFd};
 use std::os::unix::net::{UnixListener as StdUnixListener, UnixStream as StdUnixStream};
 use std::path::{Path, PathBuf};
@@ -280,7 +263,7 @@ impl<IO: AsyncIO> TcpStream<IO> {
         A: ResolveAddr + ?Sized,
     {
         // generic params are Sized by default, while str is ?Sized
-        io_with_timeout!(IO, timeout, Self::connect::<A>(addr))
+        crate::io_with_timeout!(IO, timeout, Self::connect::<A>(addr))
     }
 
     #[inline]
@@ -661,7 +644,7 @@ impl<IO: AsyncIO> UnifyStream<IO> {
         A: ResolveAddr + ?Sized,
     {
         // generic params are Sized by default, while str is ?Sized
-        io_with_timeout!(IO, timeout, Self::connect::<A>(addr))
+        crate::io_with_timeout!(IO, timeout, Self::connect::<A>(addr))
     }
 
     #[inline]
