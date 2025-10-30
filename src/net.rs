@@ -68,9 +68,26 @@ impl<IO: AsyncIO> TcpListener<IO> {
     }
 
     /// Bind a TcpListener to the specified address.
-    pub fn bind(addr: &SocketAddr) -> io::Result<Self> {
-        let listener = StdTcpListener::bind(addr)?;
-        Self::from_std(listener)
+    pub async fn bind<A: ResolveAddr + ?Sized>(addr: &A) -> io::Result<Self> {
+        // generic params are Sized by default, while str is ?Sized
+        match addr.resolve() {
+            Ok(UnifyAddr::Socket(_addr)) => {
+                let listener = StdTcpListener::bind(&_addr)?;
+                Self::from_std(listener)
+            }
+            Ok(UnifyAddr::Path(_)) => {
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("addr {:?} invalid", addr),
+                ));
+            }
+            Err(e) => {
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("addr {:?} invalid: {:?}", addr, e),
+                ));
+            }
+        }
     }
 
     /// Accept a new connection.
@@ -217,7 +234,8 @@ impl<IO: AsyncIO> TcpStream<IO> {
     ///
     /// A future that resolves to a `Result` containing either the connected
     /// TcpStream or an I/O error.
-    pub async fn connect<A: ResolveAddr>(addr: &A) -> io::Result<Self> {
+    pub async fn connect<A: ResolveAddr + ?Sized>(addr: &A) -> io::Result<Self> {
+        // generic params are Sized by default, while str is ?Sized
         match addr.resolve() {
             Ok(UnifyAddr::Socket(socket_addr)) => {
                 let stream = IO::connect_tcp(&socket_addr).await?;
@@ -249,12 +267,12 @@ impl<IO: AsyncIO> TcpStream<IO> {
     ///
     /// A future that resolves to a `Result` containing either the connected
     /// TcpStream or an I/O error.
-    pub async fn connect_timeout<A: ResolveAddr>(
-        addr: &A, timeout: std::time::Duration,
-    ) -> io::Result<Self>
+    pub async fn connect_timeout<A>(addr: &A, timeout: std::time::Duration) -> io::Result<Self>
     where
         IO: AsyncTime,
+        A: ResolveAddr + ?Sized,
     {
+        // generic params are Sized by default, while str is ?Sized
         io_with_timeout!(IO, timeout, Self::connect::<A>(addr))
     }
 
@@ -329,6 +347,8 @@ impl<IO: AsyncIO> fmt::Debug for UnixStream<IO> {
 pub trait AsyncListener: Send + Sized + 'static + fmt::Debug {
     type Conn: Send + 'static + Sized;
 
+    fn bind(addr: &str) -> impl Future<Output = io::Result<Self>> + Send;
+
     fn accept(&mut self) -> impl Future<Output = io::Result<Self::Conn>> + Send;
 
     fn local_addr(&self) -> io::Result<String>;
@@ -348,14 +368,19 @@ pub trait AsyncListener: Send + Sized + 'static + fmt::Debug {
 impl<IO: AsyncIO> AsyncListener for TcpListener<IO> {
     type Conn = TcpStream<IO>;
 
+    #[inline]
+    async fn bind(addr: &str) -> io::Result<Self> {
+        TcpListener::<IO>::bind(addr).await
+    }
+
     #[inline(always)]
     fn accept(&mut self) -> impl Future<Output = io::Result<Self::Conn>> + Send {
-        TcpListener::accept(self)
+        TcpListener::<IO>::accept(self)
     }
 
     #[inline(always)]
     fn local_addr(&self) -> io::Result<String> {
-        TcpListener::local_addr(self)
+        TcpListener::<IO>::local_addr(self)
     }
 
     #[inline(always)]
@@ -370,14 +395,19 @@ impl<IO: AsyncIO> AsyncListener for TcpListener<IO> {
 impl<IO: AsyncIO> AsyncListener for UnixListener<IO> {
     type Conn = UnixStream<IO>;
 
+    #[inline]
+    async fn bind(addr: &str) -> io::Result<Self> {
+        UnixListener::<IO>::bind(addr)
+    }
+
     #[inline(always)]
     fn accept(&mut self) -> impl Future<Output = io::Result<Self::Conn>> + Send {
-        UnixListener::accept(self)
+        UnixListener::<IO>::accept(self)
     }
 
     #[inline(always)]
     fn local_addr(&self) -> io::Result<String> {
-        UnixListener::local_addr(self)
+        UnixListener::<IO>::local_addr(self)
     }
 
     #[inline(always)]
@@ -460,10 +490,11 @@ impl UnifyAddr {
 ///
 /// If multiple IP addresses are resolved, only the first result is taken
 pub trait ResolveAddr: fmt::Debug + Send + Sync {
+    // Trait are ?Sized by default
     fn resolve(&self) -> Result<UnifyAddr, AddrParseError>;
 }
 
-impl ResolveAddr for &str {
+impl ResolveAddr for str {
     #[inline]
     fn resolve(&self) -> Result<UnifyAddr, AddrParseError> {
         return UnifyAddr::resolve(self);
@@ -566,7 +597,8 @@ impl<IO: AsyncIO> UnifyStream<IO> {
     ///
     /// A future that resolves to a `Result` containing either the connected
     /// UnifyStream or an I/O error.
-    pub async fn connect<A: ResolveAddr>(addr: &A) -> io::Result<Self> {
+    pub async fn connect<A: ResolveAddr + ?Sized>(addr: &A) -> io::Result<Self> {
+        // generic params are Sized by default, while str is ?Sized
         match addr.resolve() {
             Err(e) => {
                 return Err(io::Error::new(
@@ -603,10 +635,12 @@ impl<IO: AsyncIO> UnifyStream<IO> {
     ///
     /// A future that resolves to a `Result` containing either the connected
     /// UnifyStream or an I/O error.
-    pub async fn connect_timeout<A: ResolveAddr>(addr: &A, timeout: Duration) -> io::Result<Self>
+    pub async fn connect_timeout<A>(addr: &A, timeout: Duration) -> io::Result<Self>
     where
         IO: AsyncTime,
+        A: ResolveAddr + ?Sized,
     {
+        // generic params are Sized by default, while str is ?Sized
         io_with_timeout!(IO, timeout, Self::connect::<A>(addr))
     }
 
@@ -683,7 +717,8 @@ impl<IO: AsyncIO> UnifyListener<IO> {
     /// This is a smart version of bind, accepts string type addr
     ///
     /// For unix, will remove the path if exist, prevent failure
-    pub fn bind<A: ResolveAddr>(addr: &A) -> io::Result<Self> {
+    pub async fn bind<A: ResolveAddr + ?Sized>(addr: &A) -> io::Result<Self> {
+        // generic params are Sized by default, while str is ?Sized
         match addr.resolve() {
             Err(e) => {
                 return Err(io::Error::new(
@@ -691,7 +726,7 @@ impl<IO: AsyncIO> UnifyListener<IO> {
                     format!("addr {:?} invalid: {:?}", addr, e),
                 ));
             }
-            Ok(UnifyAddr::Socket(_addr)) => Ok(Self::Tcp(TcpListener::<IO>::bind(&_addr)?)),
+            Ok(UnifyAddr::Socket(_addr)) => Ok(Self::Tcp(TcpListener::<IO>::bind(&_addr).await?)),
             Ok(UnifyAddr::Path(ref path)) => {
                 if path.exists() {
                     std::fs::remove_file(path)?;
@@ -753,6 +788,11 @@ impl<IO: AsyncIO> UnifyListener<IO> {
 
 impl<IO: AsyncIO> AsyncListener for UnifyListener<IO> {
     type Conn = UnifyStream<IO>;
+
+    #[inline]
+    async fn bind(addr: &str) -> io::Result<Self> {
+        UnifyListener::<IO>::bind(addr).await
+    }
 
     #[inline]
     async fn accept(&mut self) -> io::Result<UnifyStream<IO>> {

@@ -43,8 +43,8 @@ pub mod utils;
 /// Importing this prelude is the recommended way to use Orb in your code.
 pub mod prelude {
     pub use crate::AsyncRuntime;
-    pub use crate::io::AsyncFd;
-    pub use crate::io::{AsyncBufRead, AsyncBufWrite, AsyncIO, AsyncRead, AsyncWrite};
+    pub use crate::io::{AsyncBufRead, AsyncBufWrite, AsyncFd, AsyncIO, AsyncRead, AsyncWrite};
+    pub use crate::net::AsyncListener;
     pub use crate::runtime::{AsyncExec, AsyncJoinHandle};
     pub use crate::time::{AsyncTime, TimeInterval};
     // Re-export the Stream trait so users can import it
