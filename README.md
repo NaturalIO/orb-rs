@@ -11,10 +11,12 @@ We took the name `Orb` because it gets around :)
 
 ## Features
 
-- **Runtime Agnostic**: Write code that works with multiple async runtimes
-- **Trait-Based**: Clean, well-defined interfaces for async operations
-- **Extensible**: Easy to implement support for new runtimes
-- **Lightweight**: No overhead abstraction layer
+- Runtime Agnostic: Write code that works with multiple async runtimes
+- Extensible: Easy to implement support for new runtimes as plugin, without modification to the main crate.
+- networking:
+    - Provide unify abstraction (tcp + unix) as `UnifyListener` / `UnifyStream`
+    - Non-blocking name resolving: via `ResolveAddr` trait
+    - timeout functions and macro `io_with_timeout`
 
 ## The goal
 

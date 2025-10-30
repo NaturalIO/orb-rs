@@ -3,9 +3,9 @@
 //! This module provides async listener abstractions for TCP and Unix domain sockets.
 //!
 //! Additionally, we provides:
-//! - [UnifyAddr] type for smart address parsing, and trait [ResolveAddr] which provde async
+//! - [UnifyAddr] type for smart address parsing, and trait [ResolveAddr] which provides async
 //! fn resolve(), to replace std [ToSocketAddrs](https://doc.rust-lang.org/std/net/trait.ToSocketAddrs.html),
-//! - [UnifyStream] + [UnixListener] to provide consistent interface for both socket types.
+//! - [UnifyStream] + [UnixListener] to provide consistent interface for both tcp + unix socket types.
 
 use crate::io::{AsyncFd, AsyncIO, AsyncRead, AsyncWrite};
 use crate::runtime::{AsyncExec, AsyncJoinHandle};

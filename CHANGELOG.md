@@ -15,6 +15,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.3.0] - 2025-10-31
+
+### Added
+
+- runtime: Add `AsyncExec::spawn_blocking()`
+
+- export macro `io_with_timeout`
+
+### Change
+
+- net: Change ResolveAddr trait to async, change bind to async, resolve names in background
+
 ## [0.2.0] - 2025-10-30
 
 ### Added
