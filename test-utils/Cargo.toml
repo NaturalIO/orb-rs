@@ -1,6 +1,5 @@
 [package]
 name = "orb-test-utils"
-version = "0.1.0"
 edition = "2021"
 authors = ["plan <frostyplanet@gmail.com>"]
 categories = ["concurrency", "network-programming"]
@@ -13,6 +12,6 @@ Testing utilities for the orb async runtime abstraction.
 """
 
 [dependencies]
-orb = { path = "../", version = "0.1" }
+orb = { path = "../", version = ">=0.1" }
 log = { version = "0.4", features = ["std", "kv_unstable"] }
 captains-log = ">=0.15"
