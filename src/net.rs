@@ -3,11 +3,12 @@
 //! This module provides async listener abstractions for TCP and Unix domain sockets.
 //!
 //! Additionally, we provides:
-//! - [UnifyAddr] type for smart address parsing, and trait [ResolveAddr]
-//! to replace std [ToSocketAddrs](https://doc.rust-lang.org/std/net/trait.ToSocketAddrs.html),
+//! - [UnifyAddr] type for smart address parsing, and trait [ResolveAddr] which provde async
+//! fn resolve(), to replace std [ToSocketAddrs](https://doc.rust-lang.org/std/net/trait.ToSocketAddrs.html),
 //! - [UnifyStream] + [UnixListener] to provide consistent interface for both socket types.
 
-use super::{AsyncFd, AsyncIO, AsyncRead, AsyncWrite};
+use crate::io::{AsyncFd, AsyncIO, AsyncRead, AsyncWrite};
+use crate::runtime::{AsyncExec, AsyncJoinHandle};
 use crate::time::AsyncTime;
 use std::fmt;
 use std::io;
@@ -68,9 +69,12 @@ impl<IO: AsyncIO> TcpListener<IO> {
     }
 
     /// Bind a TcpListener to the specified address.
-    pub async fn bind<A: ResolveAddr + ?Sized>(addr: &A) -> io::Result<Self> {
+    pub async fn bind<A: ResolveAddr + ?Sized>(addr: &A) -> io::Result<Self>
+    where
+        IO: AsyncExec,
+    {
         // generic params are Sized by default, while str is ?Sized
-        match addr.resolve() {
+        match addr.resolve::<IO>().await {
             Ok(UnifyAddr::Socket(_addr)) => {
                 let listener = StdTcpListener::bind(&_addr)?;
                 Self::from_std(listener)
@@ -234,9 +238,12 @@ impl<IO: AsyncIO> TcpStream<IO> {
     ///
     /// A future that resolves to a `Result` containing either the connected
     /// TcpStream or an I/O error.
-    pub async fn connect<A: ResolveAddr + ?Sized>(addr: &A) -> io::Result<Self> {
+    pub async fn connect<A: ResolveAddr + ?Sized>(addr: &A) -> io::Result<Self>
+    where
+        IO: AsyncExec,
+    {
         // generic params are Sized by default, while str is ?Sized
-        match addr.resolve() {
+        match addr.resolve::<IO>().await {
             Ok(UnifyAddr::Socket(socket_addr)) => {
                 let stream = IO::connect_tcp(&socket_addr).await?;
                 Ok(TcpStream { inner: stream })
@@ -265,11 +272,11 @@ impl<IO: AsyncIO> TcpStream<IO> {
     ///
     /// # Returns
     ///
-    /// A future that resolves to a `Result` containing either the connected
+    /// A future that returns to a `Result` containing either the connected
     /// TcpStream or an I/O error.
     pub async fn connect_timeout<A>(addr: &A, timeout: std::time::Duration) -> io::Result<Self>
     where
-        IO: AsyncTime,
+        IO: AsyncTime + AsyncTime + AsyncExec,
         A: ResolveAddr + ?Sized,
     {
         // generic params are Sized by default, while str is ?Sized
@@ -308,7 +315,7 @@ impl<IO: AsyncIO> UnixStream<IO> {
     ///
     /// # Returns
     ///
-    /// A future that resolves to a `Result` containing either the connected
+    /// A future that returns `Result` containing either the connected
     /// UnixStream or an I/O error.
     pub async fn connect<P: AsRef<Path>>(addr: P) -> io::Result<Self> {
         let path_buf = addr.as_ref().to_path_buf();
@@ -365,7 +372,7 @@ pub trait AsyncListener: Send + Sized + 'static + fmt::Debug {
         Self: AsRawFd;
 }
 
-impl<IO: AsyncIO> AsyncListener for TcpListener<IO> {
+impl<IO: AsyncIO + AsyncExec> AsyncListener for TcpListener<IO> {
     type Conn = TcpStream<IO>;
 
     #[inline]
@@ -392,7 +399,7 @@ impl<IO: AsyncIO> AsyncListener for TcpListener<IO> {
     }
 }
 
-impl<IO: AsyncIO> AsyncListener for UnixListener<IO> {
+impl<IO: AsyncIO + AsyncExec> AsyncListener for UnixListener<IO> {
     type Conn = UnixStream<IO>;
 
     #[inline]
@@ -466,17 +473,25 @@ impl UnifyAddr {
         Ok(Self::Socket(a))
     }
 
-    pub fn resolve(s: &str) -> Result<Self, AddrParseError> {
+    /// Try to parse or resolve the address name
+    ///
+    /// If the param is dns name, will resolve in the background
+    #[inline]
+    pub async fn resolve<E: AsyncExec>(s: &str) -> Result<Self, AddrParseError> {
         // TODO change this to async
         match Self::parse(s) {
             Ok(addr) => return Ok(addr),
-            Err(e) => match s.to_socket_addrs() {
-                Ok(mut _v) => match _v.next() {
-                    Some(a) => Ok(Self::Socket(a)),
-                    None => Err(e),
-                },
-                Err(_) => Err(e),
-            },
+            Err(e) => {
+                let s = s.to_string();
+                let task = E::spawn_blocking(move || s.to_socket_addrs());
+                match task.join().await.expect("resolve addr task") {
+                    Ok(mut _v) => match _v.next() {
+                        Some(a) => Ok(Self::Socket(a)),
+                        None => Err(e),
+                    },
+                    Err(_) => Err(e),
+                }
+            }
         }
     }
 }
@@ -491,26 +506,28 @@ impl UnifyAddr {
 /// If multiple IP addresses are resolved, only the first result is taken
 pub trait ResolveAddr: fmt::Debug + Send + Sync {
     // Trait are ?Sized by default
-    fn resolve(&self) -> Result<UnifyAddr, AddrParseError>;
+    fn resolve<E: AsyncExec>(
+        &self,
+    ) -> impl Future<Output = Result<UnifyAddr, AddrParseError>> + Send;
 }
 
 impl ResolveAddr for str {
     #[inline]
-    fn resolve(&self) -> Result<UnifyAddr, AddrParseError> {
-        return UnifyAddr::resolve(self);
+    async fn resolve<E: AsyncExec>(&self) -> Result<UnifyAddr, AddrParseError> {
+        return UnifyAddr::resolve::<E>(self).await;
     }
 }
 
 impl ResolveAddr for String {
     #[inline]
-    fn resolve(&self) -> Result<UnifyAddr, AddrParseError> {
-        return UnifyAddr::resolve(self.as_str());
+    async fn resolve<E: AsyncExec>(&self) -> Result<UnifyAddr, AddrParseError> {
+        return UnifyAddr::resolve::<E>(self.as_str()).await;
     }
 }
 
 impl<T: Into<UnifyAddr> + Clone + Send + Sync + fmt::Debug> ResolveAddr for T {
     #[inline]
-    fn resolve(&self) -> Result<UnifyAddr, AddrParseError> {
+    async fn resolve<E: AsyncExec>(&self) -> Result<UnifyAddr, AddrParseError> {
         Ok(self.clone().into())
     }
 }
@@ -597,9 +614,12 @@ impl<IO: AsyncIO> UnifyStream<IO> {
     ///
     /// A future that resolves to a `Result` containing either the connected
     /// UnifyStream or an I/O error.
-    pub async fn connect<A: ResolveAddr + ?Sized>(addr: &A) -> io::Result<Self> {
+    pub async fn connect<A: ResolveAddr + ?Sized>(addr: &A) -> io::Result<Self>
+    where
+        IO: AsyncExec + AsyncTime,
+    {
         // generic params are Sized by default, while str is ?Sized
-        match addr.resolve() {
+        match addr.resolve::<IO>().await {
             Err(e) => {
                 return Err(io::Error::new(
                     io::ErrorKind::Other,
@@ -637,7 +657,7 @@ impl<IO: AsyncIO> UnifyStream<IO> {
     /// UnifyStream or an I/O error.
     pub async fn connect_timeout<A>(addr: &A, timeout: Duration) -> io::Result<Self>
     where
-        IO: AsyncTime,
+        IO: AsyncTime + AsyncExec,
         A: ResolveAddr + ?Sized,
     {
         // generic params are Sized by default, while str is ?Sized
@@ -717,9 +737,12 @@ impl<IO: AsyncIO> UnifyListener<IO> {
     /// This is a smart version of bind, accepts string type addr
     ///
     /// For unix, will remove the path if exist, prevent failure
-    pub async fn bind<A: ResolveAddr + ?Sized>(addr: &A) -> io::Result<Self> {
+    pub async fn bind<A: ResolveAddr + ?Sized>(addr: &A) -> io::Result<Self>
+    where
+        IO: AsyncExec,
+    {
         // generic params are Sized by default, while str is ?Sized
-        match addr.resolve() {
+        match addr.resolve::<IO>().await {
             Err(e) => {
                 return Err(io::Error::new(
                     io::ErrorKind::Other,
@@ -786,7 +809,7 @@ impl<IO: AsyncIO> UnifyListener<IO> {
     }
 }
 
-impl<IO: AsyncIO> AsyncListener for UnifyListener<IO> {
+impl<IO: AsyncIO + AsyncExec> AsyncListener for UnifyListener<IO> {
     type Conn = UnifyStream<IO>;
 
     #[inline]
