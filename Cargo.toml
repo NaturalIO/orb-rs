@@ -23,3 +23,4 @@ futures-lite = "2.6"
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 rand = "0.8"
+async-executor = "1"

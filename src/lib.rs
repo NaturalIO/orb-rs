@@ -31,6 +31,7 @@
 //! [`AsyncJoinHandle::detach`] rather than just dropping the handle.
 
 pub mod io;
+pub mod net;
 pub mod runtime;
 pub mod time;
 pub mod utils;

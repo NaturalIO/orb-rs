@@ -72,6 +72,10 @@ pub trait AsyncIO: Send + Sync + 'static {
 
     /// Connect to a TCP address asynchronously.
     ///
+    /// # NOTE
+    ///
+    /// This is for runtime implementation, for user should use [TcpStream::<IO>::connect()](crate::net::TcpStream) instead**.
+    ///
     /// This method attempts to establish a TCP connection to the specified
     /// address, returning an async file descriptor that can be used for
     /// communication.
@@ -90,6 +94,10 @@ pub trait AsyncIO: Send + Sync + 'static {
 
     /// Connect to a Unix socket address asynchronously.
     ///
+    /// # NOTE
+    ///
+    /// This is for runtime implementation, for user should use [UnixStream::<IO>::connect()](crate::net::UnixStream) instead**.
+    ///
     /// This method attempts to establish a Unix socket connection to the
     /// specified path, returning an async file descriptor that can be used
     /// for communication.
@@ -107,6 +115,8 @@ pub trait AsyncIO: Send + Sync + 'static {
     ) -> impl Future<Output = io::Result<Self::AsyncFd<UnixStream>>> + Send;
 
     /// Connect to a TCP address with a timeout.
+    ///
+    ///
     ///
     /// This method is similar to [`connect_tcp`](Self::connect_tcp) but
     /// includes a timeout that will cancel the connection attempt if it
@@ -156,11 +166,10 @@ pub trait AsyncIO: Send + Sync + 'static {
         async move { io_with_timeout!(Self, timeout, Self::connect_unix(addr)) }
     }
 
-    /// Convert a readable file descriptor to an async handle.
+    /// Wrap a readable file object to an async handle
     ///
-    /// This method wraps a file descriptor in an async handle that can
-    /// perform async read operations. Note that the file descriptor must
-    /// be set to non-blocking mode before calling this method.
+    /// The file descriptor will subscribe for read
+    /// to the runtime poller
     ///
     /// # Parameters
     ///
@@ -179,11 +188,10 @@ pub trait AsyncIO: Send + Sync + 'static {
         fd: T,
     ) -> io::Result<Self::AsyncFd<T>>;
 
-    /// Convert a readable/writable file descriptor to an async handle.
+    /// Wrap a readable/writable file object to an async handle.
     ///
-    /// This method wraps a file descriptor in an async handle that can
-    /// perform both async read and write operations. Note that the file
-    /// descriptor must be set to non-blocking mode before calling this method.
+    /// The file descriptor will subscribe for read + write
+    /// to the runtime poller
     ///
     /// # Parameters
     ///
