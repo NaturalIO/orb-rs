@@ -14,6 +14,7 @@ fn test_tokio_rt(setup: (), #[case] rt: TokioRT) {
     let _ = setup; // Explicitly ignore the fixture value
     test_runtime_basics(&rt);
     test_time_functionality(&rt);
+    test_spawn_blocking::<TokioRT>(&rt);
 }
 
 #[rstest]

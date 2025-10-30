@@ -16,6 +16,7 @@ fn test_smol_rt_with_global(setup: ()) {
     let rt = SmolRT::new_global();
     test_runtime_basics(&rt);
     test_time_functionality(&rt);
+    test_spawn_blocking::<SmolRT>(&rt);
 }
 
 #[cfg(feature = "global")]
@@ -36,6 +37,7 @@ fn test_smol_rt_with_executor(setup: ()) {
     let rt = SmolRT::new(Arc::new(Executor::new()));
     test_runtime_basics(&rt);
     test_time_functionality(&rt);
+    test_spawn_blocking::<SmolRT>(&rt);
 }
 
 #[rstest]

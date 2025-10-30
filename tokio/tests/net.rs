@@ -8,11 +8,13 @@ fn setup() {
 }
 
 #[rstest]
-fn test_unify_addr_resolve(setup: ()) {
+#[case(TokioRT::new_multi_thread(2))]
+#[case(TokioRT::new_current_thread())]
+fn test_unify_addr_resolve(setup: (), #[case] rt: TokioRT) {
     let _ = setup; // Explicitly ignore the fixture value
 
     // Run the test directly
-    orb_test_utils::test_unify_addr_resolve();
+    orb_test_utils::test_unify_addr_resolve::<TokioRT>(&rt);
 }
 
 #[rstest]

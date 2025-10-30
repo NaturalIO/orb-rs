@@ -12,7 +12,8 @@ fn setup() {
 #[rstest]
 fn test_unify_addr_resolve(setup: ()) {
     let _ = setup; // Explicitly ignore the fixture value
-    orb_test_utils::test_unify_addr_resolve();
+    let rt = SmolRT::new(Arc::new(Executor::new()));
+    orb_test_utils::test_unify_addr_resolve::<SmolRT>(&rt);
 }
 
 #[rstest]

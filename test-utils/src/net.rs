@@ -6,43 +6,49 @@ use std::time::Duration;
 
 /// Test UnifyAddr resolve functionality
 #[logfn]
-pub fn test_unify_addr_resolve() {
-    use orb::net::UnifyAddr;
-    use std::net::{IpAddr, Ipv4Addr};
-    use std::path::PathBuf;
+pub fn test_unify_addr_resolve<RT: AsyncRuntime + std::fmt::Debug>(rt: &RT) {
+    rt.block_on(async {
+        use orb::net::UnifyAddr;
+        use std::net::{IpAddr, Ipv4Addr};
+        use std::path::PathBuf;
 
-    // Test TCP address resolution
-    let tcp_addr = UnifyAddr::resolve("127.0.0.1:8080").expect("Failed to resolve TCP address");
-    match tcp_addr {
-        UnifyAddr::Socket(addr) => {
-            assert_eq!(addr.ip(), IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
-            assert_eq!(addr.port(), 8080);
+        // Test TCP address resolution
+        let tcp_addr = UnifyAddr::resolve::<RT>("127.0.0.1:8080")
+            .await
+            .expect("Failed to resolve TCP address");
+        match tcp_addr {
+            UnifyAddr::Socket(addr) => {
+                assert_eq!(addr.ip(), IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
+                assert_eq!(addr.port(), 8080);
+            }
+            _ => panic!("Expected Socket address"),
         }
-        _ => panic!("Expected Socket address"),
-    }
 
-    // Test Unix socket path resolution
-    let unix_addr = UnifyAddr::resolve("/tmp/test.sock").expect("Failed to resolve Unix address");
-    match unix_addr {
-        UnifyAddr::Path(path) => {
-            assert_eq!(path, PathBuf::from("/tmp/test.sock"));
+        // Test Unix socket path resolution
+        let unix_addr = UnifyAddr::resolve::<RT>("/tmp/test.sock")
+            .await
+            .expect("Failed to resolve Unix address");
+        match unix_addr {
+            UnifyAddr::Path(path) => {
+                assert_eq!(path, PathBuf::from("/tmp/test.sock"));
+            }
+            _ => panic!("Expected Path address"),
         }
-        _ => panic!("Expected Path address"),
-    }
 
-    // Test hostname resolution (this should work for localhost)
-    let localhost_addr = UnifyAddr::resolve("localhost:8080");
-    // Note: This might fail in some environments, so we just check it doesn't panic
-    if let Ok(addr) = localhost_addr {
-        match addr {
-            UnifyAddr::Socket(_) => {} // Expected
-            _ => panic!("Expected Socket address for localhost"),
+        // Test hostname resolution (this should work for localhost)
+        let localhost_addr = UnifyAddr::resolve::<RT>("localhost:8080");
+        // Note: This might fail in some environments, so we just check it doesn't panic
+        if let Ok(addr) = localhost_addr.await {
+            match addr {
+                UnifyAddr::Socket(_) => {} // Expected
+                _ => panic!("Expected Socket address for localhost"),
+            }
         }
-    }
 
-    // Test invalid address resolution
-    let invalid_addr = UnifyAddr::resolve("invalid_address_that_does_not_exist");
-    assert!(invalid_addr.is_err());
+        // Test invalid address resolution
+        let invalid_addr = UnifyAddr::resolve::<RT>("invalid_address_that_does_not_exist");
+        assert!(invalid_addr.await.is_err());
+    });
 }
 
 /// Test TCP client-server communication
@@ -56,7 +62,8 @@ where
 
         // Use port 0 to let the OS choose a random available port
         let addr: std::net::SocketAddr = "127.0.0.1:0".parse().unwrap();
-        let mut listener = TcpListener::<RT>::bind(&addr).expect("Failed to create TCP listener");
+        let mut listener =
+            TcpListener::<RT>::bind(&addr).await.expect("Failed to create TCP listener");
 
         // Get the actual port assigned by the OS
         let server_addr = listener.local_addr().expect("Failed to get local address");
@@ -179,8 +186,9 @@ where
 {
     rt.block_on(async {
         // Use port 0 to let the OS choose a random available port
-        let mut listener =
-            UnifyListener::<RT>::bind(&"127.0.0.1:0").expect("Failed to create TCP UnifyListener");
+        let mut listener = UnifyListener::<RT>::bind("127.0.0.1:0")
+            .await
+            .expect("Failed to create TCP UnifyListener");
 
         // Get the actual port assigned by the OS
         let server_addr = listener.local_addr().expect("Failed to get local address");
@@ -243,7 +251,8 @@ where
     rt.block_on(async {
         // Start server in a separate task
         let server_handle = rt.spawn(async {
-            let mut listener = UnifyListener::<RT>::bind(&"/tmp/test_unify_socket_client_server")
+            let mut listener = UnifyListener::<RT>::bind("/tmp/test_unify_socket_client_server")
+                .await
                 .expect("Failed to create Unix UnifyListener");
 
             // Accept one connection
@@ -269,9 +278,11 @@ where
         RT::sleep(Duration::from_millis(100)).await;
 
         // Connect as client
-        let mut client_stream = UnifyStream::<RT>::connect(&"/tmp/test_unify_socket_client_server")
-            .await
-            .expect("Failed to connect to server");
+        let mut client_stream = UnifyStream::<RT>::connect(&std::path::PathBuf::from(
+            "/tmp/test_unify_socket_client_server",
+        ))
+        .await
+        .expect("Failed to connect to server");
 
         // Send data to server
         let message = "Hello from client!";

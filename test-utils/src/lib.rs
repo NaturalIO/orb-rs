@@ -145,3 +145,23 @@ where
         }
     });
 }
+
+/// Test spawn_blocking functionality
+#[logfn]
+pub fn test_spawn_blocking<RT: AsyncRuntime + std::fmt::Debug>(rt: &RT) {
+    let result = rt.block_on(async {
+        // We need to spawn a task that calls spawn_blocking from within the runtime context
+        let handle = rt.spawn(async {
+            RT::spawn_blocking(|| {
+                // Simulate some blocking work
+                std::thread::sleep(std::time::Duration::from_millis(50));
+                42
+            })
+            .join()
+            .await
+        });
+        handle.join().await.unwrap()
+    });
+
+    assert_eq!(result, Ok(42));
+}
