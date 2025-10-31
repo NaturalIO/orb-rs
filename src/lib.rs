@@ -23,13 +23,6 @@
 //! impl<F: std::ops::Deref<Target = T> + Send + Sync + 'static, T: AsyncRuntime> AsyncRuntime for F {}
 //! ```
 //! Simimlar blanket trait can be found on other sub traits.
-//!
-//! ## Important Notes
-//!
-//! When working with spawned tasks, be aware that some runtimes (like smol) will
-//! cancel the future if you drop the task handle without explicitly detaching it.
-//! If you want a task to continue running in the background, you must call
-//! [`AsyncJoinHandle::detach`] rather than just dropping the handle.
 
 pub mod io;
 pub mod net;

@@ -12,6 +12,7 @@ We took the name `Orb` because it gets around :)
 ## Features
 
 - Runtime Agnostic: Write code that works with multiple async runtimes
+    - The hehavior of this crate is more aligned to tokio, to prevent unnotice bugs (for example, dropping a task handle means detach by default)
 - Extensible: Easy to implement support for new runtimes as plugin, without modification to the main crate.
 - networking:
     - Provide unify abstraction (tcp + unix) as `UnifyListener` / `UnifyStream`
@@ -24,6 +25,7 @@ The main goal is to decouple your application logic from specific async runtime 
 - Write portable async code that works at the same time in combination of multiple runtimes
 - Switch to new runtimes without changing your core logic
 - Test your code with different runtime characteristics
+- Enhance async network programing experience
 
 
 This is a side project during the development of [razor-rpc](https://docs.rs/razor-rpc). Because:
