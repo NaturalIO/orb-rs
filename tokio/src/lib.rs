@@ -203,8 +203,10 @@ impl AsyncExec for TokioRT {
             Self::Runtime(s) => {
                 return s.block_on(f);
             }
-            Self::Handle(s) => {
-                return s.block_on(f);
+            Self::Handle(_s) => {
+                // panic in order to prevent misbehaved code.
+                // refer to https://docs.rs/tokio/latest/tokio/runtime/struct.Handle.html#method.block_on
+                panic!("handle is not allowed to block_on");
             }
         }
     }
