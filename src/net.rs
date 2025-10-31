@@ -8,7 +8,7 @@
 //! - [UnifyStream] + [UnixListener] to provide consistent interface for both tcp + unix socket types.
 
 use crate::io::{AsyncFd, AsyncIO, AsyncRead, AsyncWrite, io_with_timeout};
-use crate::runtime::{AsyncExec, AsyncJoinHandle};
+use crate::runtime::{AsyncExec, ThreadJoinHandle};
 use crate::time::AsyncTime;
 use std::fmt;
 use std::io;

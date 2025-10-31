@@ -43,6 +43,10 @@ pub trait AsyncExec: Send + Sync + 'static {
     /// task. The returned handle can be used to wait for the task's completion
     /// and retrieve its result.
     ///
+    /// # NOTE:
+    ///
+    /// This method adopts the behavior of tokio
+    ///
     /// # Type Parameters
     ///
     /// * `F` - The future type to spawn
@@ -56,6 +60,7 @@ pub trait AsyncExec: Send + Sync + 'static {
     ///
     /// A handle that implements [`AsyncJoinHandle`] and can be used to await
     /// the task's result.
+    ///
     fn spawn<F, R>(&self, f: F) -> impl AsyncJoinHandle<R>
     where
         F: Future<Output = R> + Send + 'static,
@@ -100,7 +105,7 @@ pub trait AsyncExec: Send + Sync + 'static {
     ///
     /// A handle that implements [`AsyncJoinHandle`] and can be used to await
     /// the call result.
-    fn spawn_blocking<F, R>(f: F) -> impl AsyncJoinHandle<R>
+    fn spawn_blocking<F, R>(f: F) -> impl ThreadJoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static;
@@ -148,7 +153,7 @@ impl<FT: std::ops::Deref<Target = T> + Send + Sync + 'static, T: AsyncExec> Asyn
     }
 
     #[inline(always)]
-    fn spawn_blocking<F, R>(f: F) -> impl AsyncJoinHandle<R>
+    fn spawn_blocking<F, R>(f: F) -> impl ThreadJoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
@@ -171,6 +176,11 @@ impl<FT: std::ops::Deref<Target = T> + Send + Sync + 'static, T: AsyncExec> Asyn
 /// This trait provides methods for waiting for a task's completion or
 /// detaching it to run in the background.
 ///
+/// # NOTE:
+///
+/// The behavior of dropping a AsyncJoinHandle should be detach, we adopt this behavior because
+/// user is more familiar with tokio's behavior. We don't want bugs when dropping the task handle unnoticed.
+///
 /// # Type Parameters
 ///
 /// * `T` - The return type of the task
@@ -189,14 +199,34 @@ pub trait AsyncJoinHandle<T: Send>: Send {
     /// Detach the task to run in the background without waiting for its result.
     ///
     /// After calling this method, the task will continue running until it
-    /// completes or the program exits, but there will be no way to retrieve
-    /// its result.
-    ///
-    /// # Warning
-    ///
-    /// Some runtimes (like smol) will cancel the future if you drop the task handle
-    /// without calling this method. If you want the task to continue running in
-    /// the background, you must explicitly call `detach()` rather than just
-    /// dropping the handle.
+    /// completes or until its runtime dropped.
     fn detach(self);
+
+    /// Abort the task execution, don't care for it's result
+    fn abort(self);
+}
+
+/// A handle for spawn_blocking()
+///
+/// This trait provides methods for waiting for a blocking task's completion or
+/// detaching it to run in the background.
+///
+/// # NOTE:
+///
+/// The behavior of dropping a ThreadJoinHandle will not abort the task (since it run as pthread)
+///
+/// # Type Parameters
+///
+/// * `T` - The return type of the task
+pub trait ThreadJoinHandle<T: Send>: Send {
+    /// Wait for the task to complete and return its result.
+    ///
+    /// This method returns a future that resolves to either the task's
+    /// successful result or an error if the task panicked.
+    ///
+    /// # Returns
+    ///
+    /// A future that resolves to `Ok(T)` if the task completed successfully,
+    /// or `Err(())` if the task failed.
+    fn join(self) -> impl Future<Output = Result<T, ()>> + Send;
 }

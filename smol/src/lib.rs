@@ -39,7 +39,7 @@ use async_io::{Async, Timer};
 use futures_lite::future::block_on;
 use futures_lite::stream::StreamExt;
 use orb::io::{AsyncFd, AsyncIO};
-use orb::runtime::{AsyncExec, AsyncJoinHandle};
+use orb::runtime::{AsyncExec, AsyncJoinHandle, ThreadJoinHandle};
 use orb::time::{AsyncTime, TimeInterval};
 use std::fmt;
 use std::future::Future;
@@ -132,17 +132,39 @@ impl AsyncTime for SmolRT {
 }
 
 /// AsyncJoinHandle implementation for smol
-pub struct SmolJoinHandle<T>(async_executor::Task<T>);
+pub struct SmolJoinHandle<T>(Option<async_executor::Task<T>>);
 
 impl<T: Send + 'static> AsyncJoinHandle<T> for SmolJoinHandle<T> {
     #[inline]
-    async fn join(self) -> Result<T, ()> {
-        Ok(self.0.await)
+    async fn join(mut self) -> Result<T, ()> {
+        Ok(self.0.take().unwrap().await)
+    }
+
+    #[inline(always)]
+    fn abort(self) {
+        // do nothing, the inner task will be dropped
     }
 
     #[inline]
-    fn detach(self) {
-        self.0.detach();
+    fn detach(mut self) {
+        self.0.take().unwrap().detach();
+    }
+}
+
+impl<T> Drop for SmolJoinHandle<T> {
+    fn drop(&mut self) {
+        if let Some(handle) = self.0.take() {
+            handle.detach();
+        }
+    }
+}
+
+pub struct BlockingJoinHandle<T>(async_executor::Task<T>);
+
+impl<T: Send + 'static> ThreadJoinHandle<T> for BlockingJoinHandle<T> {
+    #[inline]
+    async fn join(self) -> Result<T, ()> {
+        Ok(self.0.await)
     }
 }
 
@@ -164,7 +186,7 @@ impl AsyncExec for SmolRT {
                 unreachable!();
             }
         };
-        SmolJoinHandle(handle)
+        SmolJoinHandle(Some(handle))
     }
 
     /// Depends on how you initialize SmolRT, spawn with executor or globally
@@ -178,12 +200,12 @@ impl AsyncExec for SmolRT {
     }
 
     #[inline]
-    fn spawn_blocking<F, R>(f: F) -> impl AsyncJoinHandle<R>
+    fn spawn_blocking<F, R>(f: F) -> impl ThreadJoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        SmolJoinHandle(blocking::unblock(f))
+        BlockingJoinHandle(blocking::unblock(f))
     }
 
     /// Run a future to completion on the runtime

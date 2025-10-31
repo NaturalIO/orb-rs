@@ -45,7 +45,7 @@ pub mod prelude {
     pub use crate::AsyncRuntime;
     pub use crate::io::{AsyncBufRead, AsyncBufWrite, AsyncFd, AsyncIO, AsyncRead, AsyncWrite};
     pub use crate::net::AsyncListener;
-    pub use crate::runtime::{AsyncExec, AsyncJoinHandle};
+    pub use crate::runtime::{AsyncExec, AsyncJoinHandle, ThreadJoinHandle};
     pub use crate::time::{AsyncTime, TimeInterval};
     // Re-export the Stream trait so users can import it
     pub use futures_lite::stream::Stream;

@@ -16,7 +16,7 @@
 //! ```
 
 use orb::io::{AsyncFd, AsyncIO};
-pub use orb::runtime::{AsyncExec, AsyncJoinHandle};
+pub use orb::runtime::{AsyncExec, AsyncJoinHandle, ThreadJoinHandle};
 use orb::time::{AsyncTime, TimeInterval};
 use std::fmt;
 use std::future::Future;
@@ -166,12 +166,12 @@ impl AsyncExec for TokioRT {
     }
 
     #[inline(always)]
-    fn spawn_blocking<F, R>(f: F) -> impl AsyncJoinHandle<R>
+    fn spawn_blocking<F, R>(f: F) -> impl ThreadJoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        TokioJoinHandle(tokio::task::spawn_blocking(f))
+        TokioThreadJoinHandle(tokio::task::spawn_blocking(f))
     }
 
     /// Run a future to completion on the runtime
@@ -247,5 +247,23 @@ impl<T: Send> AsyncJoinHandle<T> for TokioJoinHandle<T> {
     fn detach(self) {
         // Tokio's JoinHandle doesn't need explicit detach, it will run in background
         // when the handle is dropped
+    }
+
+    #[inline]
+    fn abort(self) {
+        self.0.abort();
+    }
+}
+
+/// A wrapper around tokio's JoinHandle that implements ThreadJoinHandle
+pub struct TokioThreadJoinHandle<T>(tokio::task::JoinHandle<T>);
+
+impl<T: Send> ThreadJoinHandle<T> for TokioThreadJoinHandle<T> {
+    #[inline]
+    async fn join(self) -> Result<T, ()> {
+        match self.0.await {
+            Ok(r) => Ok(r),
+            Err(_) => Err(()),
+        }
     }
 }
