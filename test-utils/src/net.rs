@@ -109,7 +109,7 @@ where
         assert_eq!(received, "Hello from server!");
 
         // Wait for server to complete
-        let server_result = server_handle.join().await.expect("Server task failed");
+        let server_result = server_handle.await.expect("Server task failed");
         assert!(server_result);
     });
 }
@@ -170,7 +170,7 @@ where
         assert_eq!(received, "Hello from server!");
 
         // Wait for server to complete
-        let server_result = server_handle.join().await.expect("Server task failed");
+        let server_result = server_handle.await.expect("Server task failed");
         assert!(server_result);
     });
 
@@ -234,7 +234,7 @@ where
         assert_eq!(received, "Hello from server!");
 
         // Wait for server to complete
-        let server_result = server_handle.join().await.expect("Server task failed");
+        let server_result = server_handle.await.expect("Server task failed");
         assert!(server_result);
     });
 }
@@ -297,7 +297,7 @@ where
         assert_eq!(received, "Hello from server!");
 
         // Wait for server to complete
-        let server_result = server_handle.join().await.expect("Server task failed");
+        let server_result = server_handle.await.expect("Server task failed");
         assert!(server_result);
     });
 

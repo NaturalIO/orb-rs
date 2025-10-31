@@ -15,3 +15,4 @@ Testing utilities for the orb async runtime abstraction.
 orb = { path = "../", version = ">=0.1" }
 log = { version = "0.4", features = ["std", "kv_unstable"] }
 captains-log = ">=0.15"
+futures-lite = "2.6"

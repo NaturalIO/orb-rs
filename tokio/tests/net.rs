@@ -1,4 +1,4 @@
-use orb_test_utils::*;
+use orb_test_utils::{net::*, *};
 use orb_tokio::TokioRT;
 use rstest::*;
 
@@ -10,49 +10,25 @@ fn setup() {
 #[rstest]
 #[case(TokioRT::new_multi_thread(2))]
 #[case(TokioRT::new_current_thread())]
-fn test_unify_addr_resolve(setup: (), #[case] rt: TokioRT) {
+fn test_addr_resolve(setup: (), #[case] rt: TokioRT) {
     let _ = setup; // Explicitly ignore the fixture value
-
-    // Run the test directly
-    orb_test_utils::test_unify_addr_resolve::<TokioRT>(&rt);
+    test_unify_addr_resolve::<TokioRT>(&rt);
 }
 
 #[rstest]
 #[case(TokioRT::new_multi_thread(2))]
 #[case(TokioRT::new_current_thread())]
-fn test_tcp_client_server(setup: (), #[case] rt: TokioRT) {
+fn test_tcp(setup: (), #[case] rt: TokioRT) {
     let _ = setup; // Explicitly ignore the fixture value
-
-    // Run the test directly without spawning a task
-    orb_test_utils::test_tcp_client_server(&rt);
+    test_tcp_client_server(&rt);
+    test_unify_tcp_client_server(&rt);
 }
 
 #[rstest]
 #[case(TokioRT::new_multi_thread(2))]
 #[case(TokioRT::new_current_thread())]
-fn test_unix_client_server(setup: (), #[case] rt: TokioRT) {
+fn test_unix(setup: (), #[case] rt: TokioRT) {
     let _ = setup; // Explicitly ignore the fixture value
-
-    // Run the test directly without spawning a task
-    orb_test_utils::test_unix_client_server(&rt);
-}
-
-#[rstest]
-#[case(TokioRT::new_multi_thread(2))]
-#[case(TokioRT::new_current_thread())]
-fn test_unify_tcp_client_server(setup: (), #[case] rt: TokioRT) {
-    let _ = setup; // Explicitly ignore the fixture value
-
-    // Run the test directly without spawning a task
-    orb_test_utils::test_unify_tcp_client_server(&rt);
-}
-
-#[rstest]
-#[case(TokioRT::new_multi_thread(2))]
-#[case(TokioRT::new_current_thread())]
-fn test_unify_unix_client_server(setup: (), #[case] rt: TokioRT) {
-    let _ = setup; // Explicitly ignore the fixture value
-
-    // Run the test directly without spawning a task
-    orb_test_utils::test_unify_unix_client_server(&rt);
+    test_unix_client_server(&rt);
+    test_unify_unix_client_server(&rt);
 }
