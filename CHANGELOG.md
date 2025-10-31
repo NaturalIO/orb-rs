@@ -15,6 +15,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.4.0] - 2025-10-31
+
+### Added
+
+- orb-smol: Add `unwind` feature, to catch panic inside the task
+
+- orb-tokio:
+  - TokioRT created with Handle not allowed to call `block_on`.
+  - Add Clone to TokioRT
+
+- AsyncJoinHandle: Add is_finished()
+
+### Changed
+
+- runtime:
+  - Unify the drop behavior of AsyncJoinHandle, to aligned with tokio.
+  - `spawn_blocking()` should return ThreadJoinHandle
+  - Remove `join()` method, handle itself should be a future
+
 ## [0.3.2] - 2025-10-31
 
 ### Fixed

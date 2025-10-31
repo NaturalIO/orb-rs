@@ -1,6 +1,6 @@
 [package]
 name = "orb-tokio"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 authors = ["plan <frostyplanet@gmail.com>"]
 categories = ["concurrency", "network-programming"]
@@ -16,7 +16,7 @@ Orb is an abstraction for writing runtime agnostic async code.
 
 [dependencies]
 tokio = { version = "1", features = ["net", "time", "rt", "rt-multi-thread"] }
-orb = { path = "../", version = ">=0.1" }
+orb = { path = "../", version = ">=0.4" }
 
 [dev-dependencies]
 orb-test-utils = { path = "../test-utils" }
