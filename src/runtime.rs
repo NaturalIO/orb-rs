@@ -75,7 +75,8 @@ pub trait AsyncExec: Send + Sync + 'static {
     ///
     /// The behavior of panic varies for runtimes:
     /// - tokio will ignore other tasks panic after detached,
-    /// - async-executor (smol) will not capture panic, the program will exit
+    /// - async-executor (smol) will not capture panic by default, the program will exit. There's a
+    /// feature switch in [orb-smol](https://docs.rs/orb-smol) to change this behavior.
     ///
     /// # Type Parameters
     ///

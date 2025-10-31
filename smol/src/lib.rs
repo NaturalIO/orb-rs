@@ -9,8 +9,12 @@
 //!
 //! ## Features
 //!
-//! - `global`: Enables the global executor feature, which allows using a global executor
-//!   instead of providing your own executor instance.
+//! - `global`: Enables the global executor feature, which allows using `smol` default global executor
+//!   instead of providing your own executor instance. (by default not enabled, omit the `smol`
+//!   dependency)
+//!
+//! - `unwind`: Use AssertUnwindSafe to capture panic inside the task, and return Err(()) to the
+//! task join handle. (by default not enabled, panic terminates the program)
 //!
 //! ## Usage
 //!
@@ -36,8 +40,7 @@
 
 use async_executor::Executor;
 use async_io::{Async, Timer};
-use futures_lite::future::block_on;
-use futures_lite::stream::StreamExt;
+use futures_lite::{future::block_on, stream::StreamExt};
 use orb::io::{AsyncFd, AsyncIO};
 use orb::runtime::{AsyncExec, AsyncJoinHandle, ThreadJoinHandle};
 use orb::time::{AsyncTime, TimeInterval};
@@ -131,7 +134,24 @@ impl AsyncTime for SmolRT {
     }
 }
 
+macro_rules! unwind_wrap {
+    ($f: expr) => {{
+        #[cfg(feature = "unwind")]
+        {
+            use futures_lite::future::FutureExt;
+            std::panic::AssertUnwindSafe($f).catch_unwind()
+        }
+        #[cfg(not(feature = "unwind"))]
+        $f
+    }};
+}
+
 /// AsyncJoinHandle implementation for smol
+#[cfg(feature = "unwind")]
+pub struct SmolJoinHandle<T>(
+    Option<async_executor::Task<Result<T, Box<dyn std::any::Any + Send>>>>,
+);
+#[cfg(not(feature = "unwind"))]
 pub struct SmolJoinHandle<T>(Option<async_executor::Task<T>>);
 
 impl<T: Send + 'static> AsyncJoinHandle<T> for SmolJoinHandle<T> {
@@ -159,7 +179,14 @@ impl<T: Send + 'static> Future for SmolJoinHandle<T> {
         let _self = unsafe { self.get_unchecked_mut() };
         if let Some(inner) = _self.0.as_mut() {
             if let Poll::Ready(r) = Pin::new(inner).poll(cx) {
-                return Poll::Ready(Ok(r));
+                #[cfg(feature = "unwind")]
+                {
+                    return Poll::Ready(r.map_err(|_e| ()));
+                }
+                #[cfg(not(feature = "unwind"))]
+                {
+                    return Poll::Ready(Ok(r));
+                }
             }
             Poll::Pending
         } else {
@@ -206,11 +233,11 @@ impl AsyncExec for SmolRT {
         R: Send + 'static,
     {
         let handle = match &self.0 {
-            Some(exec) => exec.spawn(f),
+            Some(exec) => exec.spawn(unwind_wrap!(f)),
             None => {
                 #[cfg(feature = "global")]
                 {
-                    smol::spawn(f)
+                    smol::spawn(unwind_wrap!(f))
                 }
                 #[cfg(not(feature = "global"))]
                 unreachable!();
@@ -226,7 +253,7 @@ impl AsyncExec for SmolRT {
         F: Future<Output = R> + Send + 'static,
         R: Send + 'static,
     {
-        self.spawn(f).detach();
+        self.spawn(unwind_wrap!(f)).detach();
     }
 
     #[inline]

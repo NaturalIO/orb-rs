@@ -33,3 +33,4 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 global = ["dep:smol"]
+unwind = [] # Use AssertUnwindSafe when spawn task

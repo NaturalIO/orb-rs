@@ -26,6 +26,7 @@ test-tokio: init
 test-smol: init
 	cargo check -p orb-smol
 	cargo test -p orb-smol ${ARGS} -F global -- --nocapture --test-threads=1
+	cargo test -p orb-smol panic -F unwind -- --nocapture --test-threads=1
 
 .PHONY: build
 build: init

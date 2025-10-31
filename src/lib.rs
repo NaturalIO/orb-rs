@@ -13,15 +13,20 @@
 //! At top level [AsyncRuntime] trait will combine all the capabilities, including
 //! [`AsyncExec`], [`AsyncIO`], and [`AsyncTime`].
 //!
-//! ## Runtime Variaty Note
+//! ## Runtime Varieties Note
 //!
-//! ### spawn
+//! ### Task Detach
+//!
+//! The drop behavior of task handle is unified to "detach", task will not be cancel unless
+//! [abort](AsyncJoinHandle::abort) is called.
+//!
+//! ### Panic
 //!
 //! - tokio will issolate panic between tasks, a task handle may return Err() on join.
 //! - smol will not issolate panic. Although a panic hook will work, the program might panic if one
-//! of the task panic. you may use unwind to capture them.
+//! of the task panic. You may use feature `unwind` to enable panic capturing.
 //!
-//! ### cloning
+//! ### Cloning
 //!
 //! Both `TokioRT` and `SmolRT` have impl Clone, but [AsyncRuntime] and [AsyncExec] does not
 //! include Clone because not sure about other runtime. you may explicitly mark Clone with our

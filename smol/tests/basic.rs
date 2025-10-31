@@ -34,6 +34,7 @@ fn test_smol_rt_with_executor(setup: ()) {
     test_tick_stream(&rt);
 }
 
+#[cfg(not(feature = "unwind"))]
 #[rstest]
 #[should_panic]
 fn test_smol_rt_panic(setup: ()) {
@@ -47,5 +48,22 @@ fn test_smol_rt_panic(setup: ()) {
             panic!("test task panic");
         });
         let _ = handle.await;
+    });
+}
+
+#[cfg(feature = "unwind")]
+#[rstest]
+fn test_smol_rt_panic(setup: ()) {
+    let _ = setup; // Explicitly ignore the fixture value
+    let rt = SmolRT::new(Arc::new(Executor::new()));
+    let _rt = rt.clone();
+    // the panic hook will work, but the program will terminate
+    rt.block_on(async move {
+        let handle = _rt.spawn(async {
+            SmolRT::sleep(Duration::from_secs(1)).await;
+            panic!("test task panic");
+        });
+        assert!(handle.await.is_err());
+        println!("panic captured");
     });
 }
