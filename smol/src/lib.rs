@@ -135,11 +135,6 @@ impl AsyncTime for SmolRT {
 pub struct SmolJoinHandle<T>(Option<async_executor::Task<T>>);
 
 impl<T: Send + 'static> AsyncJoinHandle<T> for SmolJoinHandle<T> {
-    #[inline]
-    async fn join(mut self) -> Result<T, ()> {
-        Ok(self.0.take().unwrap().await)
-    }
-
     #[inline(always)]
     fn abort(self) {
         // do nothing, the inner task will be dropped
@@ -148,6 +143,28 @@ impl<T: Send + 'static> AsyncJoinHandle<T> for SmolJoinHandle<T> {
     #[inline]
     fn detach(mut self) {
         self.0.take().unwrap().detach();
+    }
+
+    #[inline]
+    fn is_finished(&self) -> bool {
+        self.0.as_ref().unwrap().is_finished()
+    }
+}
+
+impl<T: Send + 'static> Future for SmolJoinHandle<T> {
+    type Output = Result<T, ()>;
+
+    #[inline]
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let _self = unsafe { self.get_unchecked_mut() };
+        if let Some(inner) = _self.0.as_mut() {
+            if let Poll::Ready(r) = Pin::new(inner).poll(cx) {
+                return Poll::Ready(Ok(r));
+            }
+            Poll::Pending
+        } else {
+            Poll::Ready(Err(()))
+        }
     }
 }
 
@@ -163,8 +180,21 @@ pub struct BlockingJoinHandle<T>(async_executor::Task<T>);
 
 impl<T: Send + 'static> ThreadJoinHandle<T> for BlockingJoinHandle<T> {
     #[inline]
-    async fn join(self) -> Result<T, ()> {
-        Ok(self.0.await)
+    fn is_finished(&self) -> bool {
+        self.0.is_finished()
+    }
+}
+
+impl<T: Send + 'static> Future for BlockingJoinHandle<T> {
+    type Output = Result<T, ()>;
+
+    #[inline]
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let _self = unsafe { self.get_unchecked_mut() };
+        if let Poll::Ready(r) = Pin::new(&mut _self.0).poll(cx) {
+            return Poll::Ready(Ok(r));
+        }
+        Poll::Pending
     }
 }
 

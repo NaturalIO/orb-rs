@@ -236,11 +236,8 @@ pub struct TokioJoinHandle<T>(tokio::task::JoinHandle<T>);
 
 impl<T: Send> AsyncJoinHandle<T> for TokioJoinHandle<T> {
     #[inline]
-    async fn join(self) -> Result<T, ()> {
-        match self.0.await {
-            Ok(r) => Ok(r),
-            Err(_) => Err(()),
-        }
+    fn is_finished(&self) -> bool {
+        self.0.is_finished()
     }
 
     #[inline]
@@ -255,15 +252,38 @@ impl<T: Send> AsyncJoinHandle<T> for TokioJoinHandle<T> {
     }
 }
 
+impl<T: Send> Future for TokioJoinHandle<T> {
+    type Output = Result<T, ()>;
+
+    #[inline]
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let _self = unsafe { self.get_unchecked_mut() };
+        if let Poll::Ready(r) = Pin::new(&mut _self.0).poll(cx) {
+            return Poll::Ready(r.map_err(|_e| ()));
+        }
+        Poll::Pending
+    }
+}
+
 /// A wrapper around tokio's JoinHandle that implements ThreadJoinHandle
 pub struct TokioThreadJoinHandle<T>(tokio::task::JoinHandle<T>);
 
 impl<T: Send> ThreadJoinHandle<T> for TokioThreadJoinHandle<T> {
     #[inline]
-    async fn join(self) -> Result<T, ()> {
-        match self.0.await {
-            Ok(r) => Ok(r),
-            Err(_) => Err(()),
+    fn is_finished(&self) -> bool {
+        self.0.is_finished()
+    }
+}
+
+impl<T: Send> Future for TokioThreadJoinHandle<T> {
+    type Output = Result<T, ()>;
+
+    #[inline]
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let _self = unsafe { self.get_unchecked_mut() };
+        if let Poll::Ready(r) = Pin::new(&mut _self.0).poll(cx) {
+            return Poll::Ready(r.map_err(|_e| ()));
         }
+        Poll::Pending
     }
 }

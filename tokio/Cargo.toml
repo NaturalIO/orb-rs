@@ -19,7 +19,6 @@ tokio = { version = "1", features = ["net", "time", "rt", "rt-multi-thread"] }
 orb = { path = "../", version = ">=0.1" }
 
 [dev-dependencies]
-futures = "0.3"
 orb-test-utils = { path = "../test-utils" }
 rstest = "0"
 

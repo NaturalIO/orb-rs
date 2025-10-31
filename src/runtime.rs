@@ -184,17 +184,14 @@ impl<FT: std::ops::Deref<Target = T> + Send + Sync + 'static, T: AsyncExec> Asyn
 /// # Type Parameters
 ///
 /// * `T` - The return type of the task
-pub trait AsyncJoinHandle<T: Send>: Send {
-    /// Wait for the task to complete and return its result.
-    ///
-    /// This method returns a future that resolves to either the task's
-    /// successful result or an error if the task panicked.
-    ///
-    /// # Returns
-    ///
-    /// A future that resolves to `Ok(T)` if the task completed successfully,
-    /// or `Err(())` if the task failed.
-    fn join(self) -> impl Future<Output = Result<T, ()>> + Send;
+///
+/// # Returns
+///
+/// A future that resolves to `Ok(T)` if the task completed successfully,
+/// or `Err(())` if the task panics.
+pub trait AsyncJoinHandle<T: Send>: Send + Future<Output = Result<T, ()>> {
+    /// Whether a task can be join immediately
+    fn is_finished(&self) -> bool;
 
     /// Detach the task to run in the background without waiting for its result.
     ///
@@ -211,6 +208,8 @@ pub trait AsyncJoinHandle<T: Send>: Send {
 /// This trait provides methods for waiting for a blocking task's completion or
 /// detaching it to run in the background.
 ///
+/// Calling await on the ThreadJoinHandle will get Result<T, ()>.
+///
 /// # NOTE:
 ///
 /// The behavior of dropping a ThreadJoinHandle will not abort the task (since it run as pthread)
@@ -218,15 +217,12 @@ pub trait AsyncJoinHandle<T: Send>: Send {
 /// # Type Parameters
 ///
 /// * `T` - The return type of the task
-pub trait ThreadJoinHandle<T: Send>: Send {
-    /// Wait for the task to complete and return its result.
-    ///
-    /// This method returns a future that resolves to either the task's
-    /// successful result or an error if the task panicked.
-    ///
-    /// # Returns
-    ///
-    /// A future that resolves to `Ok(T)` if the task completed successfully,
-    /// or `Err(())` if the task failed.
-    fn join(self) -> impl Future<Output = Result<T, ()>> + Send;
+///
+/// # Returns
+///
+/// A future that resolves to `Ok(T)` if the task completed successfully,
+/// or `Err(())` if the task panics.
+pub trait ThreadJoinHandle<T: Send>: Send + Future<Output = Result<T, ()>> {
+    /// Whether a task can be join immediately
+    fn is_finished(&self) -> bool;
 }

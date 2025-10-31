@@ -8,7 +8,7 @@
 //! - [UnifyStream] + [UnixListener] to provide consistent interface for both tcp + unix socket types.
 
 use crate::io::{AsyncFd, AsyncIO, AsyncRead, AsyncWrite, io_with_timeout};
-use crate::runtime::{AsyncExec, ThreadJoinHandle};
+use crate::runtime::AsyncExec;
 use crate::time::AsyncTime;
 use std::fmt;
 use std::io;
@@ -467,7 +467,7 @@ impl UnifyAddr {
             Err(e) => {
                 let s = s.to_string();
                 let task = E::spawn_blocking(move || s.to_socket_addrs());
-                match task.join().await.expect("resolve addr task") {
+                match task.await.expect("resolve addr task") {
                     Ok(mut _v) => match _v.next() {
                         Some(a) => Ok(Self::Socket(a)),
                         None => Err(e),
