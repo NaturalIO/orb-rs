@@ -7,7 +7,7 @@
 //! fn resolve(), to replace std [ToSocketAddrs](https://doc.rust-lang.org/std/net/trait.ToSocketAddrs.html),
 //! - [UnifyStream] + [UnixListener] to provide consistent interface for both tcp + unix socket types.
 
-use crate::io::{AsyncFd, AsyncIO, AsyncRead, AsyncWrite};
+use crate::io::{AsyncFd, AsyncIO, AsyncRead, AsyncWrite, io_with_timeout};
 use crate::runtime::{AsyncExec, AsyncJoinHandle};
 use crate::time::AsyncTime;
 use std::fmt;
@@ -263,7 +263,7 @@ impl<IO: AsyncIO> TcpStream<IO> {
         A: ResolveAddr + ?Sized,
     {
         // generic params are Sized by default, while str is ?Sized
-        crate::io_with_timeout!(IO, timeout, Self::connect::<A>(addr))
+        io_with_timeout!(IO, timeout, Self::connect::<A>(addr))
     }
 
     #[inline]
@@ -644,7 +644,7 @@ impl<IO: AsyncIO> UnifyStream<IO> {
         A: ResolveAddr + ?Sized,
     {
         // generic params are Sized by default, while str is ?Sized
-        crate::io_with_timeout!(IO, timeout, Self::connect::<A>(addr))
+        io_with_timeout!(IO, timeout, Self::connect::<A>(addr))
     }
 
     #[inline]

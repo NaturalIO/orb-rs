@@ -14,7 +14,6 @@ Orb 是一个用于编写运行时无关的异步 Rust 代码的抽象层，允�
 - 网络功能：
     - 提供了额外的统一类型抽象，如 (tcp + unix) `UnifyListener` / `UnifyStream`
     - 通过 `ResolveAddr` trait 提供非阻塞域名解析
-    - 超时函数和宏 `io_with_timeout`
 
 
 ## 开发目标

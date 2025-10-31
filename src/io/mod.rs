@@ -32,19 +32,18 @@ use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 
 mod buf_io;
-pub use buf_io::{AsyncBufRead, AsyncBufStream, AsyncBufWrite, AsyncRead, AsyncWrite};
+pub use buf_io::{AsyncBufRead, AsyncBufStream, AsyncBufWrite};
 
 /// Helper macro to convert timeout errors to IO errors.
 ///
 /// This macro is used internally to convert the `()` error returned by
 /// timeout functions into a proper `io::Error` with `TimedOut` kind.
-#[macro_export]
 macro_rules! io_with_timeout {
     ($IO: path, $timeout: expr, $f: expr) => {{
         if $timeout == Duration::from_secs(0) {
             $f.await
         } else {
-            // rust 2018 macro will replace crate name after export
+            // the crate reference make this macro not exportable
             match <$IO as crate::time::AsyncTime>::timeout($timeout, $f).await {
                 Ok(Ok(r)) => Ok(r),
                 Ok(Err(e)) => Err(e),
@@ -53,6 +52,7 @@ macro_rules! io_with_timeout {
         }
     }};
 }
+pub(super) use io_with_timeout;
 
 /// Trait for async I/O operations.
 ///
@@ -228,5 +228,119 @@ impl<F: std::ops::Deref<Target = IO> + Send + Sync + 'static, IO: AsyncIO> Async
         fd: T,
     ) -> io::Result<Self::AsyncFd<T>> {
         IO::to_async_fd_rw(fd)
+    }
+}
+
+/// AsyncRead trait for runtime adapter
+pub trait AsyncRead: Send {
+    /// Async version of read function
+    ///
+    /// On ok, return the bytes read
+    fn read(&mut self, buf: &mut [u8]) -> impl Future<Output = io::Result<usize>> + Send;
+
+    /// Read the exact number of bytes required to fill `buf`.
+    ///
+    /// This function repeatedly calls `read` until the buffer is completely filled.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the stream is closed before the
+    /// buffer is filled.
+    fn read_exact<'a>(
+        &'a mut self, mut buf: &'a mut [u8],
+    ) -> impl Future<Output = io::Result<()>> + Send + 'a {
+        async move {
+            while !buf.is_empty() {
+                match self.read(buf).await {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        let tmp = buf;
+                        buf = &mut tmp[n..];
+                    }
+                    Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
+                    Err(e) => return Err(e),
+                }
+            }
+            if !buf.is_empty() {
+                Err(io::Error::new(io::ErrorKind::UnexpectedEof, "failed to fill whole buffer"))
+            } else {
+                Ok(())
+            }
+        }
+    }
+
+    /// Reads at least `min_len` bytes into `buf`.
+    ///
+    /// This function repeatedly calls `read` until at least `min_len` bytes have been
+    /// read. It is allowed to read more than `min_len` bytes, but not more than
+    /// the length of `buf`.
+    ///
+    /// # Returns
+    ///
+    /// On success, returns the total number of bytes read. This will be at least
+    /// `min_len`, and could be more, up to the length of `buf`.
+    ///
+    /// # Errors
+    ///
+    /// It will return an `UnexpectedEof` error if the stream is closed before at least `min_len` bytes have been read.
+    fn read_at_least<'a>(
+        &'a mut self, buf: &'a mut [u8], min_len: usize,
+    ) -> impl Future<Output = io::Result<usize>> + Send + 'a {
+        async move {
+            let mut total_read = 0;
+            while total_read < min_len && total_read < buf.len() {
+                match self.read(&mut buf[total_read..]).await {
+                    Ok(0) => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::UnexpectedEof,
+                            "failed to read minimum number of bytes",
+                        ));
+                    }
+                    Ok(n) => total_read += n,
+                    Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                    Err(e) => return Err(e),
+                };
+            }
+            Ok(total_read)
+        }
+    }
+}
+
+/// AsyncWrite trait for runtime adapter
+pub trait AsyncWrite: Send {
+    /// Async version of write function
+    ///
+    /// On ok, return the bytes written
+    fn write(&mut self, buf: &[u8]) -> impl Future<Output = io::Result<usize>> + Send;
+
+    /// Write the entire buffer `buf`.
+    ///
+    /// This function repeatedly calls `write` until the entire buffer is written.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the stream is closed before the
+    /// entire buffer is written.
+    fn write_all<'a>(
+        &'a mut self, mut buf: &'a [u8],
+    ) -> impl Future<Output = io::Result<()>> + Send + 'a {
+        async move {
+            while !buf.is_empty() {
+                match self.write(buf).await {
+                    Ok(0) => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::WriteZero,
+                            "failed to write whole buffer",
+                        ));
+                    }
+                    Ok(n) => {
+                        buf = &buf[n..];
+                    }
+                    Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
+                    Err(e) => return Err(e),
+                }
+            }
+            Ok(())
+        }
     }
 }

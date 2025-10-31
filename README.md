@@ -16,7 +16,6 @@ We took the name `Orb` because it gets around :)
 - networking:
     - Provide unify abstraction (tcp + unix) as `UnifyListener` / `UnifyStream`
     - Non-blocking name resolving: via `ResolveAddr` trait
-    - timeout functions and macro `io_with_timeout`
 
 ## The goal
 
