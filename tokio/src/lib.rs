@@ -78,6 +78,24 @@ impl TokioRT {
     }
 }
 
+impl Clone for TokioRT {
+    /// Clone a TokioRT::Handle out of runtime
+    fn clone(&self) -> Self {
+        match self {
+            Self::Handle(h) => {
+                return Self::Handle(h.clone());
+            }
+            Self::Runtime(r) => {
+                let handle = {
+                    let _guard = r.enter();
+                    Handle::current()
+                };
+                Self::Handle(handle)
+            }
+        }
+    }
+}
+
 impl orb::AsyncRuntime for TokioRT {}
 
 impl AsyncIO for TokioRT {
