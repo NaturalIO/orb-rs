@@ -42,7 +42,7 @@ use async_executor::Executor;
 use async_io::{Async, Timer};
 use futures_lite::{future::block_on, stream::StreamExt};
 use orb::io::{AsyncFd, AsyncIO};
-use orb::runtime::{AsyncExec, AsyncJoinHandle, ThreadJoinHandle};
+use orb::runtime::{AsyncExec, AsyncHandle, ThreadHandle};
 use orb::time::{AsyncTime, TimeInterval};
 use std::fmt;
 use std::future::Future;
@@ -146,7 +146,7 @@ macro_rules! unwind_wrap {
     }};
 }
 
-/// AsyncJoinHandle implementation for smol
+/// AsyncHandle implementation for smol
 #[cfg(feature = "unwind")]
 pub struct SmolJoinHandle<T>(
     Option<async_executor::Task<Result<T, Box<dyn std::any::Any + Send>>>>,
@@ -154,7 +154,7 @@ pub struct SmolJoinHandle<T>(
 #[cfg(not(feature = "unwind"))]
 pub struct SmolJoinHandle<T>(Option<async_executor::Task<T>>);
 
-impl<T: Send + 'static> AsyncJoinHandle<T> for SmolJoinHandle<T> {
+impl<T: Send> AsyncHandle<T> for SmolJoinHandle<T> {
     #[inline(always)]
     fn abort(self) {
         // do nothing, the inner task will be dropped
@@ -171,7 +171,7 @@ impl<T: Send + 'static> AsyncJoinHandle<T> for SmolJoinHandle<T> {
     }
 }
 
-impl<T: Send + 'static> Future for SmolJoinHandle<T> {
+impl<T> Future for SmolJoinHandle<T> {
     type Output = Result<T, ()>;
 
     #[inline]
@@ -205,14 +205,14 @@ impl<T> Drop for SmolJoinHandle<T> {
 
 pub struct BlockingJoinHandle<T>(async_executor::Task<T>);
 
-impl<T: Send + 'static> ThreadJoinHandle<T> for BlockingJoinHandle<T> {
+impl<T> ThreadHandle<T> for BlockingJoinHandle<T> {
     #[inline]
     fn is_finished(&self) -> bool {
         self.0.is_finished()
     }
 }
 
-impl<T: Send + 'static> Future for BlockingJoinHandle<T> {
+impl<T> Future for BlockingJoinHandle<T> {
     type Output = Result<T, ()>;
 
     #[inline]
@@ -226,12 +226,18 @@ impl<T: Send + 'static> Future for BlockingJoinHandle<T> {
 }
 
 impl AsyncExec for SmolRT {
+    type AsyncHandle<R: Send> = SmolJoinHandle<R>;
+
+    type ThreadHandle<R: Send> = BlockingJoinHandle<R>;
+
     /// Spawn a task in the background
-    fn spawn<F, R>(&self, f: F) -> impl AsyncJoinHandle<R>
+    fn spawn<F, R>(&self, f: F) -> Self::AsyncHandle<R>
     where
         F: Future<Output = R> + Send + 'static,
         R: Send + 'static,
     {
+        // Although SmolJoinHandle don't need Send marker, but here in the spawn()
+        // need to restrict the requirements
         let handle = match &self.0 {
             Some(exec) => exec.spawn(unwind_wrap!(f)),
             None => {
@@ -257,7 +263,7 @@ impl AsyncExec for SmolRT {
     }
 
     #[inline]
-    fn spawn_blocking<F, R>(f: F) -> impl ThreadJoinHandle<R>
+    fn spawn_blocking<F, R>(f: F) -> Self::ThreadHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,

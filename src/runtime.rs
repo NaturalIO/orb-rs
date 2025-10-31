@@ -32,6 +32,10 @@ use std::future::Future;
 /// }
 /// ```
 pub trait AsyncExec: Send + Sync + 'static {
+    type AsyncHandle<R: Send>: AsyncHandle<R>;
+
+    type ThreadHandle<R: Send>: ThreadHandle<R> + Send;
+
     /// Spawn a task in the background, returning a handle to await its result.
     ///
     /// This method creates a new task that runs concurrently with the current
@@ -40,7 +44,7 @@ pub trait AsyncExec: Send + Sync + 'static {
     ///
     /// # NOTE:
     ///
-    /// The return AsyncJoinHandle adopts the behavior of tokio.
+    /// The return AsyncHandle adopts the behavior of tokio.
     ///
     /// The behavior of panic varies for runtimes:
     /// - tokio will capture handle to task result,
@@ -57,10 +61,10 @@ pub trait AsyncExec: Send + Sync + 'static {
     ///
     /// # Returns
     ///
-    /// A handle that implements [`AsyncJoinHandle`] and can be used to await
+    /// A handle that implements [`AsyncHandle`] and can be used to await
     /// the task's result.
     ///
-    fn spawn<F, R>(&self, f: F) -> impl AsyncJoinHandle<R>
+    fn spawn<F, R>(&self, f: F) -> Self::AsyncHandle<R>
     where
         F: Future<Output = R> + Send + 'static,
         R: Send + 'static;
@@ -109,9 +113,9 @@ pub trait AsyncExec: Send + Sync + 'static {
     ///
     /// # Returns
     ///
-    /// A handle that implements [`ThreadJoinHandle`] and can be used to await
+    /// A handle that implements [`ThreadHandle`] and can be used to await
     /// the call result.
-    fn spawn_blocking<F, R>(f: F) -> impl ThreadJoinHandle<R>
+    fn spawn_blocking<F, R>(f: F) -> Self::ThreadHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static;
@@ -140,8 +144,12 @@ pub trait AsyncExec: Send + Sync + 'static {
 }
 
 impl<FT: std::ops::Deref<Target = T> + Send + Sync + 'static, T: AsyncExec> AsyncExec for FT {
+    type AsyncHandle<R: Send> = T::AsyncHandle<R>;
+
+    type ThreadHandle<R: Send> = T::ThreadHandle<R>;
+
     #[inline(always)]
-    fn spawn<F, R>(&self, f: F) -> impl AsyncJoinHandle<R>
+    fn spawn<F, R>(&self, f: F) -> Self::AsyncHandle<R>
     where
         F: Future<Output = R> + Send + 'static,
         R: Send + 'static,
@@ -159,7 +167,7 @@ impl<FT: std::ops::Deref<Target = T> + Send + Sync + 'static, T: AsyncExec> Asyn
     }
 
     #[inline(always)]
-    fn spawn_blocking<F, R>(f: F) -> impl ThreadJoinHandle<R>
+    fn spawn_blocking<F, R>(f: F) -> Self::ThreadHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
@@ -184,7 +192,7 @@ impl<FT: std::ops::Deref<Target = T> + Send + Sync + 'static, T: AsyncExec> Asyn
 ///
 /// # NOTE:
 ///
-/// The behavior of dropping a AsyncJoinHandle should be detach, we adopt this behavior because
+/// The behavior of dropping a AsyncHandle should be detach, we adopt this behavior because
 /// user is more familiar with tokio's behavior. We don't want bugs when dropping the task handle unnoticed.
 ///
 /// # Type Parameters
@@ -195,7 +203,7 @@ impl<FT: std::ops::Deref<Target = T> + Send + Sync + 'static, T: AsyncExec> Asyn
 ///
 /// A future that resolves to `Ok(T)` if the task completed successfully,
 /// or `Err(())` if the task panics.
-pub trait AsyncJoinHandle<T: Send>: Send + Future<Output = Result<T, ()>> {
+pub trait AsyncHandle<T>: Future<Output = Result<T, ()>> + Send {
     /// Whether a task can be join immediately
     fn is_finished(&self) -> bool;
 
@@ -214,11 +222,11 @@ pub trait AsyncJoinHandle<T: Send>: Send + Future<Output = Result<T, ()>> {
 /// This trait provides methods for waiting for a blocking task's completion or
 /// detaching it to run in the background.
 ///
-/// Calling await on the ThreadJoinHandle will get Result<T, ()>.
+/// Calling await on the ThreadHandle will get Result<T, ()>.
 ///
 /// # NOTE:
 ///
-/// The behavior of dropping a ThreadJoinHandle will not abort the task (since it run as pthread)
+/// The behavior of dropping a ThreadHandle will not abort the task (since it run as pthread)
 ///
 /// # Type Parameters
 ///
@@ -228,7 +236,7 @@ pub trait AsyncJoinHandle<T: Send>: Send + Future<Output = Result<T, ()>> {
 ///
 /// A future that resolves to `Ok(T)` if the task completed successfully,
 /// or `Err(())` if the task panics.
-pub trait ThreadJoinHandle<T: Send>: Send + Future<Output = Result<T, ()>> {
+pub trait ThreadHandle<T>: Future<Output = Result<T, ()>> {
     /// Whether a task can be join immediately
     fn is_finished(&self) -> bool;
 }

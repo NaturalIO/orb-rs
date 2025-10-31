@@ -18,7 +18,7 @@
 //! ### Task Detach
 //!
 //! The drop behavior of task handle is unified to "detach", task will not be cancel unless
-//! [abort](AsyncJoinHandle::abort) is called.
+//! [abort](AsyncHandle::abort) is called.
 //!
 //! ### Panic
 //!
@@ -59,7 +59,7 @@ pub mod prelude {
     pub use crate::AsyncRuntime;
     pub use crate::io::{AsyncBufRead, AsyncBufWrite, AsyncFd, AsyncIO, AsyncRead, AsyncWrite};
     pub use crate::net::AsyncListener;
-    pub use crate::runtime::{AsyncExec, AsyncJoinHandle, ThreadJoinHandle};
+    pub use crate::runtime::{AsyncExec, AsyncHandle, ThreadHandle};
     pub use crate::time::{AsyncTime, TimeInterval};
     // Re-export the Stream trait so users can import it
     pub use futures_lite::stream::Stream;

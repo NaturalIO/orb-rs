@@ -16,7 +16,7 @@
 //! ```
 
 use orb::io::{AsyncFd, AsyncIO};
-pub use orb::runtime::{AsyncExec, AsyncJoinHandle, ThreadJoinHandle};
+pub use orb::runtime::{AsyncExec, AsyncHandle, ThreadHandle};
 use orb::time::{AsyncTime, TimeInterval};
 use std::fmt;
 use std::future::Future;
@@ -149,13 +149,19 @@ impl AsyncTime for TokioRT {
 }
 
 impl AsyncExec for TokioRT {
+    type AsyncHandle<R: Send> = TokioJoinHandle<R>;
+
+    type ThreadHandle<R: Send> = TokioThreadHandle<R>;
+
     /// Spawn a task in the background, returning a handle to await its result
     #[inline]
-    fn spawn<F, R>(&self, f: F) -> impl AsyncJoinHandle<R>
+    fn spawn<F, R>(&self, f: F) -> Self::AsyncHandle<R>
     where
         F: Future<Output = R> + Send + 'static,
         R: Send + 'static,
     {
+        // Although AsyncHandle don't need Send marker, but here in the spawn()
+        // need to restrict the requirements
         match self {
             Self::Runtime(s) => {
                 return TokioJoinHandle(s.spawn(f));
@@ -184,20 +190,20 @@ impl AsyncExec for TokioRT {
     }
 
     #[inline(always)]
-    fn spawn_blocking<F, R>(f: F) -> impl ThreadJoinHandle<R>
+    fn spawn_blocking<F, R>(f: F) -> Self::ThreadHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        TokioThreadJoinHandle(tokio::task::spawn_blocking(f))
+        TokioThreadHandle(tokio::task::spawn_blocking(f))
     }
 
     /// Run a future to completion on the runtime
     #[inline]
     fn block_on<F, R>(&self, f: F) -> R
     where
-        F: Future<Output = R> + Send,
-        R: Send + 'static,
+        F: Future<Output = R>,
+        R: 'static,
     {
         match self {
             Self::Runtime(s) => {
@@ -251,10 +257,10 @@ impl<T: AsRawFd + AsFd + Send + Sync + 'static> Deref for TokioFD<T> {
     }
 }
 
-/// A wrapper around tokio's JoinHandle that implements AsyncJoinHandle
+/// A wrapper around tokio's JoinHandle that implements AsyncHandle
 pub struct TokioJoinHandle<T>(tokio::task::JoinHandle<T>);
 
-impl<T: Send> AsyncJoinHandle<T> for TokioJoinHandle<T> {
+impl<T: Send> AsyncHandle<T> for TokioJoinHandle<T> {
     #[inline]
     fn is_finished(&self) -> bool {
         self.0.is_finished()
@@ -272,7 +278,7 @@ impl<T: Send> AsyncJoinHandle<T> for TokioJoinHandle<T> {
     }
 }
 
-impl<T: Send> Future for TokioJoinHandle<T> {
+impl<T> Future for TokioJoinHandle<T> {
     type Output = Result<T, ()>;
 
     #[inline]
@@ -285,17 +291,17 @@ impl<T: Send> Future for TokioJoinHandle<T> {
     }
 }
 
-/// A wrapper around tokio's JoinHandle that implements ThreadJoinHandle
-pub struct TokioThreadJoinHandle<T>(tokio::task::JoinHandle<T>);
+/// A wrapper around tokio's JoinHandle that implements ThreadHandle
+pub struct TokioThreadHandle<T>(tokio::task::JoinHandle<T>);
 
-impl<T: Send> ThreadJoinHandle<T> for TokioThreadJoinHandle<T> {
+impl<T> ThreadHandle<T> for TokioThreadHandle<T> {
     #[inline]
     fn is_finished(&self) -> bool {
         self.0.is_finished()
     }
 }
 
-impl<T: Send> Future for TokioThreadJoinHandle<T> {
+impl<T> Future for TokioThreadHandle<T> {
     type Output = Result<T, ()>;
 
     #[inline]

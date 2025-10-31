@@ -460,19 +460,23 @@ impl UnifyAddr {
     ///
     /// If the param is dns name, will resolve in the background
     #[inline]
-    pub async fn resolve<E: AsyncExec>(s: &str) -> Result<Self, AddrParseError> {
-        // TODO change this to async
-        match Self::parse(s) {
-            Ok(addr) => return Ok(addr),
-            Err(e) => {
-                let s = s.to_string();
-                let task = E::spawn_blocking(move || s.to_socket_addrs());
-                match task.await.expect("resolve addr task") {
-                    Ok(mut _v) => match _v.next() {
-                        Some(a) => Ok(Self::Socket(a)),
-                        None => Err(e),
-                    },
-                    Err(_) => Err(e),
+    pub fn resolve<E: AsyncExec>(
+        s: &str,
+    ) -> impl Future<Output = Result<Self, AddrParseError>> + Send {
+        async move {
+            // TODO change this to async
+            match Self::parse(s) {
+                Ok(addr) => return Ok(addr),
+                Err(e) => {
+                    let s = s.to_string();
+                    let task = E::spawn_blocking(move || s.to_socket_addrs());
+                    match task.await.expect("resolve addr task") {
+                        Ok(mut _v) => match _v.next() {
+                            Some(a) => Ok(Self::Socket(a)),
+                            None => Err(e),
+                        },
+                        Err(_) => Err(e),
+                    }
                 }
             }
         }

@@ -14,7 +14,7 @@ where
 {
     let result = rt.block_on(async move {
         let start_ts = Instant::now();
-        let handle = rt.spawn(async {
+        let handle: RT::AsyncHandle<_> = rt.spawn(async {
             RT::sleep(Duration::from_secs(3)).await;
             100
         });
@@ -70,7 +70,7 @@ pub fn test_spawn_blocking<RT: AsyncRuntime + std::fmt::Debug>(rt: &RT) {
     let result = rt.block_on(async {
         // test spawn_blocking in the background does not affect foreground
         let start_ts = Instant::now();
-        let handle = RT::spawn_blocking(|| {
+        let handle: RT::ThreadHandle<_> = RT::spawn_blocking(|| {
             std::thread::sleep(Duration::from_secs(3));
             println!("back ground done");
             42
