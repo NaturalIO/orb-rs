@@ -501,6 +501,14 @@ impl ResolveAddr for str {
     }
 }
 
+// For &&str.resolve()
+impl ResolveAddr for &str {
+    #[inline]
+    async fn resolve<E: AsyncExec>(&self) -> Result<UnifyAddr, AddrParseError> {
+        return UnifyAddr::resolve::<E>(self).await;
+    }
+}
+
 impl ResolveAddr for String {
     #[inline]
     async fn resolve<E: AsyncExec>(&self) -> Result<UnifyAddr, AddrParseError> {
