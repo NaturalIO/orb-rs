@@ -3,11 +3,6 @@
 //! This module defines the interface for spawning, executing, and managing
 //! asynchronous tasks across different runtime implementations.
 //!
-//! The adaptors are provided as separate crates:
-//!
-//! - [orb-tokio](https://docs.rs/orb-tokio) - For the Tokio runtime
-//! - [orb-smol](https://docs.rs/orb-smol) - For the Smol runtime
-
 use std::future::Future;
 
 /// Trait for async runtime execution capabilities.
@@ -31,7 +26,7 @@ use std::future::Future;
 ///         });
 ///
 ///         // Wait for the result
-///         let result = handle.join().await.unwrap();
+///         let result = handle.await.unwrap();
 ///         assert_eq!(result, 42);
 ///     }
 /// }
@@ -45,7 +40,11 @@ pub trait AsyncExec: Send + Sync + 'static {
     ///
     /// # NOTE:
     ///
-    /// This method adopts the behavior of tokio
+    /// The return AsyncJoinHandle adopts the behavior of tokio.
+    ///
+    /// The behavior of panic varies for runtimes:
+    /// - tokio will capture handle to task result,
+    /// - async-executor (smol) will not capture panic, the program will exit
     ///
     /// # Type Parameters
     ///
@@ -71,6 +70,12 @@ pub trait AsyncExec: Send + Sync + 'static {
     /// This method creates a new task that runs in the background without
     /// providing a way to wait for its completion. The task will continue
     /// running until it completes or the program exits.
+    ///
+    /// # NOTE:
+    ///
+    /// The behavior of panic varies for runtimes:
+    /// - tokio will ignore other tasks panic after detached,
+    /// - async-executor (smol) will not capture panic, the program will exit
     ///
     /// # Type Parameters
     ///
@@ -103,7 +108,7 @@ pub trait AsyncExec: Send + Sync + 'static {
     ///
     /// # Returns
     ///
-    /// A handle that implements [`AsyncJoinHandle`] and can be used to await
+    /// A handle that implements [`ThreadJoinHandle`] and can be used to await
     /// the call result.
     fn spawn_blocking<F, R>(f: F) -> impl ThreadJoinHandle<R>
     where

@@ -79,7 +79,7 @@ impl TokioRT {
 }
 
 impl Clone for TokioRT {
-    /// Clone a TokioRT::Handle out of runtime
+    /// Clone a TokioRT::Handle out of runtime, for spawn
     fn clone(&self) -> Self {
         match self {
             Self::Handle(h) => {

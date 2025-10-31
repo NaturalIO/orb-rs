@@ -13,6 +13,22 @@
 //! At top level [AsyncRuntime] trait will combine all the capabilities, including
 //! [`AsyncExec`], [`AsyncIO`], and [`AsyncTime`].
 //!
+//! ## Runtime Variaty Note
+//!
+//! ### spawn
+//!
+//! - tokio will issolate panic between tasks, a task handle may return Err() on join.
+//! - smol will not issolate panic. Although a panic hook will work, the program might panic if one
+//! of the task panic. you may use unwind to capture them.
+//!
+//! ### cloning
+//!
+//! Both `TokioRT` and `SmolRT` have impl Clone, but [AsyncRuntime] and [AsyncExec] does not
+//! include Clone because not sure about other runtime. you may explicitly mark Clone with our
+//! trait marker.
+//!
+//! ## Inherence
+//!
 //! You can write your own trait by inheriting AsyncRuntime or any other trait, to provide extra
 //! functions along with the runtime object.
 //! There's an blanket trait to auto impl AsyncRuntime on anything that is `Deref<Target>` to an AsyncRuntime.
