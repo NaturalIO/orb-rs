@@ -63,7 +63,7 @@ pub(super) use io_with_timeout;
 /// # Associated Types
 ///
 /// * `AsyncFd` - The type used to represent async file descriptors
-pub trait AsyncIO: Send + Sync + 'static {
+pub trait AsyncIO {
     /// The type used to represent async file descriptors.
     ///
     /// This associated type represents a wrapper around a file descriptor
@@ -203,7 +203,7 @@ pub trait AsyncFd<T: AsRawFd + AsFd + Send + Sync + 'static>:
     ) -> impl Future<Output = io::Result<R>> + Send;
 }
 
-impl<F: std::ops::Deref<Target = IO> + Send + Sync + 'static, IO: AsyncIO> AsyncIO for F {
+impl<F: std::ops::Deref<Target = IO>, IO: AsyncIO> AsyncIO for F {
     type AsyncFd<T: AsRawFd + AsFd + Send + Sync + 'static> = IO::AsyncFd<T>;
 
     fn connect_tcp(

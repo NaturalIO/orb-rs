@@ -18,7 +18,7 @@ use std::time::{Duration, Instant};
 /// # Associated Types
 ///
 /// * `Interval` - The type used for periodic timers
-pub trait AsyncTime: Send + Sync + 'static {
+pub trait AsyncTime {
     /// The type used for periodic timers.
     type Interval: TimeInterval;
 
@@ -75,7 +75,7 @@ pub trait AsyncTime: Send + Sync + 'static {
     }
 }
 
-impl<F: std::ops::Deref<Target = T> + Send + Sync + 'static, T: AsyncTime> AsyncTime for F {
+impl<F: std::ops::Deref<Target = T>, T: AsyncTime> AsyncTime for F {
     type Interval = T::Interval;
 
     #[inline(always)]
