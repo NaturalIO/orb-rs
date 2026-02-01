@@ -29,7 +29,7 @@ use std::net::TcpStream;
 use std::ops::Deref;
 use std::os::fd::{AsFd, AsRawFd};
 use std::os::unix::net::UnixStream;
-use std::path::PathBuf;
+use std::path::Path;
 
 mod buf_io;
 pub use buf_io::{AsyncBufRead, AsyncBufStream, AsyncBufWrite};
@@ -111,7 +111,7 @@ pub trait AsyncIO {
     /// A future that resolves to a `Result` containing either the connected
     /// async file descriptor or an I/O error.
     fn connect_unix(
-        addr: &PathBuf,
+        addr: &Path,
     ) -> impl Future<Output = io::Result<Self::AsyncFd<UnixStream>>> + Send;
 
     /// Wrap a readable file object as an async handle
@@ -213,7 +213,7 @@ impl<F: std::ops::Deref<Target = IO>, IO: AsyncIO> AsyncIO for F {
     }
 
     fn connect_unix(
-        addr: &PathBuf,
+        addr: &Path,
     ) -> impl Future<Output = io::Result<Self::AsyncFd<UnixStream>>> + Send {
         IO::connect_unix(addr)
     }

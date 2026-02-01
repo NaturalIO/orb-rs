@@ -26,7 +26,7 @@ use std::net::TcpStream;
 use std::ops::Deref;
 use std::os::fd::{AsFd, AsRawFd};
 use std::os::unix::net::UnixStream;
-use std::path::PathBuf;
+use std::path::Path;
 use std::pin::Pin;
 use std::task::*;
 use std::time::{Duration, Instant};
@@ -109,7 +109,7 @@ impl AsyncIO for TokioRT {
     }
 
     #[inline(always)]
-    async fn connect_unix(addr: &PathBuf) -> io::Result<Self::AsyncFd<UnixStream>> {
+    async fn connect_unix(addr: &Path) -> io::Result<Self::AsyncFd<UnixStream>> {
         let stream = tokio::net::UnixStream::connect(addr).await?;
         // into_std will not change back to blocking
         Self::to_async_fd_rw(stream.into_std()?)

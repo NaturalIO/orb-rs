@@ -52,7 +52,7 @@ use std::net::TcpStream;
 use std::ops::Deref;
 use std::os::fd::{AsFd, AsRawFd};
 use std::os::unix::net::UnixStream;
-use std::path::PathBuf;
+use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::*;
@@ -97,9 +97,8 @@ impl AsyncIO for SmolRT {
     }
 
     #[inline(always)]
-    async fn connect_unix(addr: &PathBuf) -> io::Result<Self::AsyncFd<UnixStream>> {
-        let _addr = addr.clone();
-        let stream = Async::<UnixStream>::connect(_addr).await?;
+    async fn connect_unix(addr: &Path) -> io::Result<Self::AsyncFd<UnixStream>> {
+        let stream = Async::<UnixStream>::connect(addr).await?;
         // into_inner will not change back to blocking
         Self::to_async_fd_rw(stream.into_inner()?)
     }
