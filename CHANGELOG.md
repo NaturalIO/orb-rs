@@ -15,7 +15,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.6.0] - 2026-02-01
+
+### Fixed
+
+- AsyncTime: Rename AsyncTime::tick() to AsyncTime::interval() to prevent confuse with tick(&self)
+
+- AsyncTime: tick() should not consume self
+
+- net: Change connect_unix() arg from &PathBuf to &Path
+
 ## [0.5.0] - 2025-11-01
+
+### Added
 
 - Add AsyncHadle and ThreadHandle to AsyncExec associate types
 
