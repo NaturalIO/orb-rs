@@ -24,9 +24,9 @@ where
     rt.block_on(async {
         // Test multiple tick instances sequentially
         let start = Instant::now();
-        let ticker1 = RT::tick(Duration::from_secs(1));
-        let ticker2 = RT::tick(Duration::from_secs(1));
-        let ticker3 = RT::tick(Duration::from_secs(3));
+        let mut ticker1 = RT::interval(Duration::from_secs(1));
+        let mut ticker2 = RT::interval(Duration::from_secs(1));
+        let mut ticker3 = RT::interval(Duration::from_secs(3));
         ticker1.tick().await;
         ticker2.tick().await;
         let elapsed = start.elapsed();
@@ -45,7 +45,7 @@ where
 {
     rt.block_on(async {
         let start = Instant::now();
-        let ticker = RT::tick(Duration::from_millis(50));
+        let ticker = RT::interval(Duration::from_millis(50));
         let mut stream = ticker.into_stream();
 
         // Test Stream::next method

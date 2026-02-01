@@ -128,7 +128,7 @@ impl AsyncTime for SmolRT {
     }
 
     #[inline(always)]
-    fn tick(d: Duration) -> Self::Interval {
+    fn interval(d: Duration) -> Self::Interval {
         let later = std::time::Instant::now() + d;
         SmolInterval(Timer::interval_at(later, d))
     }

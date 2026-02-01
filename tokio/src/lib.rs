@@ -142,7 +142,7 @@ impl AsyncTime for TokioRT {
     }
 
     #[inline(always)]
-    fn tick(d: Duration) -> Self::Interval {
+    fn interval(d: Duration) -> Self::Interval {
         let later = tokio::time::Instant::now() + d;
         TokioInterval(tokio::time::interval_at(later, d))
     }

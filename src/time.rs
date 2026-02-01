@@ -48,7 +48,7 @@ pub trait AsyncTime {
     /// # Returns
     ///
     /// An interval object that implements [`TimeInterval`]
-    fn tick(d: Duration) -> Self::Interval;
+    fn interval(d: Duration) -> Self::Interval;
 
     /// Apply a timeout to a future.
     ///
@@ -84,8 +84,8 @@ impl<F: std::ops::Deref<Target = T>, T: AsyncTime> AsyncTime for F {
     }
 
     #[inline(always)]
-    fn tick(d: Duration) -> Self::Interval {
-        T::tick(d)
+    fn interval(d: Duration) -> Self::Interval {
+        T::interval(d)
     }
 }
 
@@ -116,7 +116,7 @@ pub trait TimeInterval: Unpin + Send {
     /// # Returns
     ///
     /// A future that resolves to the instant when the tick occurred.
-    fn tick(self) -> TickFuture<Self>
+    fn tick<'a>(&'a mut self) -> TickFuture<'a, Self>
     where
         Self: Sized,
     {
@@ -182,11 +182,11 @@ impl<T: TimeInterval> Stream for IntervalStream<T> {
 /// # Type Parameters
 ///
 /// * `T` - The underlying interval type
-pub struct TickFuture<T: TimeInterval> {
-    interval: T,
+pub struct TickFuture<'a, T: TimeInterval> {
+    interval: &'a mut T,
 }
 
-impl<T: TimeInterval> TickFuture<T> {
+impl<'a, T: TimeInterval> TickFuture<'a, T> {
     /// Create a new tick future.
     ///
     /// # Parameters
@@ -196,15 +196,15 @@ impl<T: TimeInterval> TickFuture<T> {
     /// # Returns
     ///
     /// A new tick future
-    pub fn new(interval: T) -> Self {
+    pub fn new(interval: &'a mut T) -> Self {
         Self { interval }
     }
 }
 
-impl<T: TimeInterval> Future for TickFuture<T> {
+impl<'a, T: TimeInterval> Future for TickFuture<'a, T> {
     type Output = Instant;
 
     fn poll(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-        unsafe { Pin::new_unchecked(&mut self.interval).poll_tick(ctx) }
+        unsafe { Pin::new_unchecked(&mut *self.interval).poll_tick(ctx) }
     }
 }
