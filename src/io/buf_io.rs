@@ -1,5 +1,4 @@
 use super::{AsyncRead, AsyncWrite};
-use std::future::Future;
 use std::{fmt, io};
 
 /// A buffered reader that wraps an `AsyncRead` trait object and a buffer.
@@ -137,8 +136,8 @@ impl<T: AsyncRead + AsyncWrite> AsyncRead for AsyncBufStream<T> {
     ///
     /// On ok, return the bytes read
     #[inline(always)]
-    fn read(&mut self, buf: &mut [u8]) -> impl Future<Output = io::Result<usize>> + Send {
-        async move { self.read_buf.read_buffered(&mut self.inner, buf).await }
+    async fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.read_buf.read_buffered(&mut self.inner, buf).await
     }
 }
 
@@ -147,7 +146,7 @@ impl<T: AsyncRead + AsyncWrite> AsyncWrite for AsyncBufStream<T> {
     ///
     /// On ok, return the bytes written
     #[inline(always)]
-    fn write(&mut self, buf: &[u8]) -> impl Future<Output = io::Result<usize>> + Send {
-        async move { self.write_buf.write_buffered(&mut self.inner, buf).await }
+    async fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.write_buf.write_buffered(&mut self.inner, buf).await
     }
 }

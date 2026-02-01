@@ -3,8 +3,8 @@
 //! This module provides async listener abstractions for TCP and Unix domain sockets.
 //!
 //! Additionally, we provides:
-//! - [UnifyAddr] type for smart address parsing, and trait [ResolveAddr] which provides async
-//! fn resolve(), to replace std [ToSocketAddrs](https://doc.rust-lang.org/std/net/trait.ToSocketAddrs.html),
+//! - [UnifyAddr] type for smart address parsing, and trait [ResolveAddr] which provides
+//!   `async fn resolve()`, to replace std [ToSocketAddrs](https://doc.rust-lang.org/std/net/trait.ToSocketAddrs.html),
 //! - [UnifyStream] + [UnixListener] to provide consistent interface for both tcp + unix socket types.
 
 use crate::io::{AsyncFd, AsyncIO, AsyncRead, AsyncWrite, io_with_timeout};
@@ -59,21 +59,11 @@ impl<IO: AsyncIO> TcpListener<IO> {
         // generic params are Sized by default, while str is ?Sized
         match addr.resolve::<IO>().await {
             Ok(UnifyAddr::Socket(_addr)) => {
-                let listener = StdTcpListener::bind(&_addr)?;
+                let listener = StdTcpListener::bind(_addr)?;
                 Self::from_std(listener)
             }
-            Ok(UnifyAddr::Path(_)) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("addr {:?} invalid", addr),
-                ));
-            }
-            Err(e) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("addr {:?} invalid: {:?}", addr, e),
-                ));
-            }
+            Ok(UnifyAddr::Path(_)) => Err(io::Error::other(format!("addr {:?} invalid", addr))),
+            Err(e) => Err(io::Error::other(format!("addr {:?} invalid: {:?}", addr, e))),
         }
     }
 
@@ -81,12 +71,9 @@ impl<IO: AsyncIO> TcpListener<IO> {
     pub async fn accept(&mut self) -> io::Result<TcpStream<IO>> {
         match self.inner.async_read(|listener| listener.accept()).await {
             Ok((stream, _)) => {
-                stream.set_nonblocking(true).map_err(|e| {
-                    io::Error::new(
-                        io::ErrorKind::Other,
-                        format!("Failed to set non-blocking: {}", e),
-                    )
-                })?;
+                stream
+                    .set_nonblocking(true)
+                    .map_err(|e| io::Error::other(format!("Failed to set non-blocking: {}", e)))?;
                 let inner = IO::to_async_fd_rw(stream)?;
                 Ok(TcpStream { inner })
             }
@@ -107,6 +94,10 @@ impl<IO: AsyncIO> TcpListener<IO> {
     /// # Arguments
     ///
     /// * addr: the addr is for determine address type
+    ///
+    /// # Safety
+    ///
+    /// The caller should make sure the fd is a correct listener
     pub unsafe fn try_from_raw_fd(addr: &str, raw_fd: RawFd) -> io::Result<Self> {
         let _ = addr; // addr is not used for TCP listeners
         let listener = unsafe { StdTcpListener::from_raw_fd(raw_fd) };
@@ -136,12 +127,9 @@ impl<IO: AsyncIO> UnixListener<IO> {
     pub async fn accept(&mut self) -> io::Result<UnixStream<IO>> {
         match self.inner.async_read(|listener| listener.accept()).await {
             Ok((stream, _)) => {
-                stream.set_nonblocking(true).map_err(|e| {
-                    io::Error::new(
-                        io::ErrorKind::Other,
-                        format!("Failed to set non-blocking: {}", e),
-                    )
-                })?;
+                stream
+                    .set_nonblocking(true)
+                    .map_err(|e| io::Error::other(format!("Failed to set non-blocking: {}", e)))?;
                 let inner = IO::to_async_fd_rw(stream)?;
                 Ok(UnixStream { inner })
             }
@@ -154,18 +142,21 @@ impl<IO: AsyncIO> UnixListener<IO> {
         let addr = self.inner.local_addr()?;
         Ok(addr
             .as_pathname()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "No pathname for Unix socket"))?
+            .ok_or_else(|| io::Error::other("No pathname for Unix socket"))?
             .to_string_lossy()
             .into_owned())
     }
 
-    /// Try to recover a listener from RawFd.
-    ///
-    /// Will set listener to non_blocking to validate the fd.
+    /// This function is for graceful restart, recognize address type according to string.
+    /// Will set listener to non_blocking to validate the fd
     ///
     /// # Arguments
     ///
     /// * addr: the addr is for determine address type
+    ///
+    /// # Safety
+    ///
+    /// The caller should make sure the fd is a correct listener
     pub unsafe fn try_from_raw_fd(addr: &str, raw_fd: RawFd) -> io::Result<Self> {
         let _ = addr; // addr is not used for Unix listeners
         let listener = unsafe { StdUnixListener::from_raw_fd(raw_fd) };
@@ -231,13 +222,8 @@ impl<IO: AsyncIO> TcpStream<IO> {
                 let stream = IO::connect_tcp(&socket_addr).await?;
                 Ok(TcpStream { inner: stream })
             }
-            Err(e) => Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("addr {:?} invalid: {:?}", addr, e),
-            )),
-            Ok(UnifyAddr::Path(_)) => {
-                Err(io::Error::new(io::ErrorKind::Other, format!("addr {:?} invalid", addr)))
-            }
+            Err(e) => Err(io::Error::other(format!("addr {:?} invalid: {:?}", addr, e))),
+            Ok(UnifyAddr::Path(_)) => Err(io::Error::other(format!("addr {:?} invalid", addr))),
         }
     }
 
@@ -345,11 +331,16 @@ pub trait AsyncListener: Send + Sized + 'static + fmt::Debug {
 
     /// Try to recover a listener from RawFd
     ///
+    /// This function is for graceful restart, recognize address type according to string.
     /// Will set listener to non_blocking to validate the fd
     ///
     /// # Arguments
     ///
     /// * addr: the addr is for determine address type
+    ///
+    /// # Safety
+    ///
+    /// The caller should make sure the fd is a correct listener
     unsafe fn try_from_raw_fd(addr: &str, raw_fd: RawFd) -> io::Result<Self>
     where
         Self: AsRawFd;
@@ -460,23 +451,19 @@ impl UnifyAddr {
     ///
     /// If the param is dns name, will resolve in the background
     #[inline]
-    pub fn resolve<E: AsyncExec>(
-        s: &str,
-    ) -> impl Future<Output = Result<Self, AddrParseError>> + Send {
-        async move {
-            // TODO change this to async
-            match Self::parse(s) {
-                Ok(addr) => return Ok(addr),
-                Err(e) => {
-                    let s = s.to_string();
-                    let task = E::spawn_blocking(move || s.to_socket_addrs());
-                    match task.await.expect("resolve addr task") {
-                        Ok(mut _v) => match _v.next() {
-                            Some(a) => Ok(Self::Socket(a)),
-                            None => Err(e),
-                        },
-                        Err(_) => Err(e),
-                    }
+    pub async fn resolve<E: AsyncExec>(s: &str) -> Result<Self, AddrParseError> {
+        // TODO change this to async
+        match Self::parse(s) {
+            Ok(addr) => Ok(addr),
+            Err(e) => {
+                let s = s.to_string();
+                let task = E::spawn_blocking(move || s.to_socket_addrs());
+                match task.await.expect("resolve addr task") {
+                    Ok(mut _v) => match _v.next() {
+                        Some(a) => Ok(Self::Socket(a)),
+                        None => Err(e),
+                    },
+                    Err(_) => Err(e),
                 }
             }
         }
@@ -615,12 +602,7 @@ impl<IO: AsyncIO> UnifyStream<IO> {
     {
         // generic params are Sized by default, while str is ?Sized
         match addr.resolve::<IO>().await {
-            Err(e) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("addr {:?} invalid: {:?}", addr, e),
-                ));
-            }
+            Err(e) => Err(io::Error::other(format!("addr {:?} invalid: {:?}", addr, e))),
             Ok(UnifyAddr::Socket(socket_addr)) => {
                 let stream = IO::connect_tcp(&socket_addr).await?;
                 let tcp_stream = TcpStream { inner: stream };
@@ -721,12 +703,12 @@ pub enum UnifyListener<IO: AsyncIO> {
 impl<IO: AsyncIO> UnifyListener<IO> {
     #[inline(always)]
     pub fn from_std_unix(l: StdUnixListener) -> io::Result<Self> {
-        return Ok(UnifyListener::Unix(UnixListener::<IO>::from_std(l)?));
+        Ok(UnifyListener::Unix(UnixListener::<IO>::from_std(l)?))
     }
 
     #[inline(always)]
     pub fn from_std_tcp(l: StdTcpListener) -> io::Result<Self> {
-        return Ok(UnifyListener::Tcp(TcpListener::<IO>::from_std(l)?));
+        Ok(UnifyListener::Tcp(TcpListener::<IO>::from_std(l)?))
     }
 
     /// This is a smart version of bind, accepts string type addr
@@ -738,18 +720,13 @@ impl<IO: AsyncIO> UnifyListener<IO> {
     {
         // generic params are Sized by default, while str is ?Sized
         match addr.resolve::<IO>().await {
-            Err(e) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("addr {:?} invalid: {:?}", addr, e),
-                ));
-            }
+            Err(e) => Err(io::Error::other(format!("addr {:?} invalid: {:?}", addr, e))),
             Ok(UnifyAddr::Socket(_addr)) => Ok(Self::Tcp(TcpListener::<IO>::bind(&_addr).await?)),
             Ok(UnifyAddr::Path(ref path)) => {
                 if path.exists() {
                     std::fs::remove_file(path)?;
                 }
-                return Ok(Self::Unix(UnixListener::<IO>::bind(path)?));
+                Ok(Self::Unix(UnixListener::<IO>::bind(path)?))
             }
         }
     }
@@ -776,16 +753,24 @@ impl<IO: AsyncIO> UnifyListener<IO> {
         }
     }
 
-    /// This function is for graceful restart, recognize address type according to string
+    /// Try to recover a listener from RawFd
+    ///
+    /// This function is for graceful restart, recognize address type according to string.
+    /// Will set listener to non_blocking to validate the fd
+    ///
+    /// # Arguments
+    ///
+    /// * addr: the addr is for determine address type
+    ///
+    /// # Safety
+    ///
+    /// The caller should make sure the fd is a correct listener
     pub unsafe fn try_from_raw_fd(addr: &str, raw_fd: RawFd) -> io::Result<Self>
     where
         Self: AsRawFd,
     {
         match UnifyAddr::from_str(addr) {
-            Err(e) => Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("addr {:?} invalid: {:?}", addr, e),
-            )),
+            Err(e) => Err(io::Error::other(format!("addr {:?} invalid: {:?}", addr, e))),
             Ok(UnifyAddr::Socket(_)) => {
                 let listener = unsafe { StdTcpListener::from_raw_fd(raw_fd) };
                 match TcpListener::from_std(listener) {
@@ -822,7 +807,6 @@ impl<IO: AsyncIO + AsyncExec> AsyncListener for UnifyListener<IO> {
         UnifyListener::<IO>::local_addr(self)
     }
 
-    /// This function is for graceful restart, recognize address type according to string
     #[inline]
     unsafe fn try_from_raw_fd(addr: &str, raw_fd: RawFd) -> io::Result<Self>
     where

@@ -52,9 +52,9 @@ impl<F: Future + Send, C: Future + Send> Future for Cancellable<F, C> {
             return Poll::Ready(Ok(output));
         }
         let cancel_future = unsafe { Pin::new_unchecked(&mut _self.cancel_future) };
-        if let Poll::Ready(_) = cancel_future.poll(cx) {
+        if cancel_future.poll(cx).is_ready() {
             return Poll::Ready(Err(()));
         }
-        return Poll::Pending;
+        Poll::Pending
     }
 }

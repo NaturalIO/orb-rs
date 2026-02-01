@@ -20,7 +20,7 @@
 //! - All types of files/streams and be converted between OS raw fd.
 //! - There's slight difference between tokio stream and async-io counterparts.
 //! - What we do here is just wrap any std blocking function with async poller when they are
-//! readable or writeable, similar with `async-io`, as a light-weight implementation.
+//!   readable or writeable, similar with `async-io`, as a light-weight implementation.
 
 use std::future::Future;
 use std::io;
