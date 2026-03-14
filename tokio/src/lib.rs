@@ -276,6 +276,17 @@ impl<T: Send> AsyncHandle<T> for TokioJoinHandle<T> {
     fn abort(self) {
         self.0.abort();
     }
+
+    #[inline(always)]
+    fn abort_boxed(self: Box<Self>) {
+        self.0.abort();
+    }
+
+    #[inline(always)]
+    fn detach_boxed(self: Box<Self>) {
+        // Tokio's JoinHandle doesn't need explicit detach, it will run in background
+        // when the handle is dropped
+    }
 }
 
 impl<T> Future for TokioJoinHandle<T> {

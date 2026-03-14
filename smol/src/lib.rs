@@ -154,19 +154,29 @@ pub struct SmolJoinHandle<T>(
 pub struct SmolJoinHandle<T>(Option<async_executor::Task<T>>);
 
 impl<T: Send> AsyncHandle<T> for SmolJoinHandle<T> {
+    #[inline]
+    fn is_finished(&self) -> bool {
+        self.0.as_ref().unwrap().is_finished()
+    }
+
     #[inline(always)]
     fn abort(self) {
         // do nothing, the inner task will be dropped
     }
 
-    #[inline]
+    #[inline(always)]
     fn detach(mut self) {
         self.0.take().unwrap().detach();
     }
 
-    #[inline]
-    fn is_finished(&self) -> bool {
-        self.0.as_ref().unwrap().is_finished()
+    #[inline(always)]
+    fn abort_boxed(self: Box<Self>) {
+        // do nothing, the inner task will be dropped
+    }
+
+    #[inline(always)]
+    fn detach_boxed(mut self: Box<Self>) {
+        self.0.take().unwrap().detach();
     }
 }
 

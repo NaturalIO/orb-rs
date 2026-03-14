@@ -19,6 +19,7 @@ fn test_tokio_rt(setup: (), #[case] rt: TokioRT) {
     test_sleep(&rt);
     test_tick(&rt);
     test_tick_stream(&rt);
+    test_boxed_async_handle(&rt);
 }
 
 #[rstest]

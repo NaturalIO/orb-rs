@@ -21,6 +21,7 @@ fn test_smol_global(setup: ()) {
     test_sleep(&rt);
     test_tick(&rt);
     test_tick_stream(&rt);
+    test_boxed_async_handle(&rt);
 }
 
 #[rstest]
@@ -32,6 +33,7 @@ fn test_smol_rt_with_executor(setup: ()) {
     test_sleep(&rt);
     test_tick(&rt);
     test_tick_stream(&rt);
+    test_boxed_async_handle(&rt);
 }
 
 #[cfg(not(feature = "unwind"))]

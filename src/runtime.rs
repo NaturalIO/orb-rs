@@ -203,7 +203,7 @@ impl<FT: std::ops::Deref<Target = T> + Send + Sync + 'static, T: AsyncExec> Asyn
 ///
 /// A future that resolves to `Ok(T)` if the task completed successfully,
 /// or `Err(())` if the task panics.
-pub trait AsyncHandle<T>: Future<Output = Result<T, ()>> + Send {
+pub trait AsyncHandle<T>: Future<Output = Result<T, ()>> + Send + Unpin {
     /// Whether a task can be join immediately
     fn is_finished(&self) -> bool;
 
@@ -211,10 +211,18 @@ pub trait AsyncHandle<T>: Future<Output = Result<T, ()>> + Send {
     ///
     /// After calling this method, the task will continue running until it
     /// completes or until its runtime dropped.
-    fn detach(self);
+    fn detach(self)
+    where
+        Self: Sized;
 
     /// Abort the task execution, don't care for it's result
-    fn abort(self);
+    fn abort(self)
+    where
+        Self: Sized;
+
+    fn detach_boxed(self: Box<Self>);
+
+    fn abort_boxed(self: Box<Self>);
 }
 
 /// A handle for spawn_blocking()
