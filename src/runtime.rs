@@ -2,8 +2,9 @@
 //!
 //! This module defines the interface for spawning, executing, and managing
 //! asynchronous tasks across different runtime implementations.
-//!
+
 use std::future::Future;
+use std::sync::Arc;
 
 /// Trait for async runtime execution capabilities.
 ///
@@ -31,7 +32,7 @@ use std::future::Future;
 ///     }
 /// }
 /// ```
-pub trait AsyncExec: Send + Sync + 'static {
+pub trait AsyncExec: AsyncExecDyn + Send + Sync + 'static {
     type AsyncHandle<R: Send>: AsyncHandle<R>;
 
     type ThreadHandle<R: Send>: ThreadHandle<R> + Send;
@@ -141,6 +142,45 @@ pub trait AsyncExec: Send + Sync + 'static {
     where
         F: Future<Output = R> + Send,
         R: Send + 'static;
+
+    fn to_dyn(self) -> Arc<dyn AsyncExecDyn>
+    where
+        Self: Sized,
+    {
+        Arc::new(self)
+    }
+}
+
+pub trait AsyncExecDyn: Send + Sync + 'static {
+    /// Spawn a task and detach it (no handle returned).
+    ///
+    /// This method creates a new task that runs in the background without
+    /// providing a way to wait for its completion. The task will continue
+    /// running until it completes or the program exits.
+    ///
+    /// # NOTE:
+    ///
+    /// The behavior of panic varies for runtimes:
+    /// - tokio will ignore other tasks panic after detached,
+    /// - async-executor (smol) will not capture panic by default, the program will exit. There's a
+    ///   feature switch in [orb-smol](https://docs.rs/orb-smol) to change this behavior.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `F` - The future type to spawn
+    /// * `R` - The return type of the future
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - The future to spawn
+    fn spawn_detach_dyn(&self, f: Box<dyn Future<Output = ()> + Send + Unpin>);
+}
+
+impl<FT: std::ops::Deref<Target = T> + Send + Sync + 'static, T: AsyncExec> AsyncExecDyn for FT {
+    #[inline]
+    fn spawn_detach_dyn(&self, f: Box<dyn Future<Output = ()> + Send + Unpin>) {
+        T::spawn_detach_dyn(self.deref(), f)
+    }
 }
 
 impl<FT: std::ops::Deref<Target = T> + Send + Sync + 'static, T: AsyncExec> AsyncExec for FT {

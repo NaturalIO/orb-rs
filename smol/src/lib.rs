@@ -42,7 +42,7 @@ use async_executor::Executor;
 use async_io::{Async, Timer};
 use futures_lite::{future::block_on, stream::StreamExt};
 use orb::io::{AsyncFd, AsyncIO};
-use orb::runtime::{AsyncExec, AsyncHandle, ThreadHandle};
+use orb::runtime::{AsyncExec, AsyncExecDyn, AsyncHandle, ThreadHandle};
 use orb::time::{AsyncTime, TimeInterval};
 use std::fmt;
 use std::future::Future;
@@ -231,6 +231,13 @@ impl<T> Future for BlockingJoinHandle<T> {
             return Poll::Ready(Ok(r));
         }
         Poll::Pending
+    }
+}
+
+impl AsyncExecDyn for SmolRT {
+    #[inline(always)]
+    fn spawn_detach_dyn(&self, f: Box<dyn Future<Output = ()> + Send + Unpin>) {
+        self.spawn(unwind_wrap!(f)).detach();
     }
 }
 

@@ -16,7 +16,7 @@
 //! ```
 
 use orb::io::{AsyncFd, AsyncIO};
-pub use orb::runtime::{AsyncExec, AsyncHandle, ThreadHandle};
+pub use orb::runtime::{AsyncExec, AsyncExecDyn, AsyncHandle, ThreadHandle};
 use orb::time::{AsyncTime, TimeInterval};
 use std::fmt;
 use std::future::Future;
@@ -145,6 +145,13 @@ impl AsyncTime for TokioRT {
     fn interval(d: Duration) -> Self::Interval {
         let later = tokio::time::Instant::now() + d;
         TokioInterval(tokio::time::interval_at(later, d))
+    }
+}
+
+impl AsyncExecDyn for TokioRT {
+    #[inline(always)]
+    fn spawn_detach_dyn(&self, f: Box<dyn Future<Output = ()> + Send + Unpin>) {
+        self.spawn(f);
     }
 }
 
