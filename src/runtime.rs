@@ -149,7 +149,7 @@ pub trait AsyncExec: AsyncExecDyn + Send + Sync + 'static {
     fn block_on<F, R>(&self, f: F) -> R
     where
         F: Future<Output = R> + Send,
-        R: Send + 'static;
+        R: 'static;
 
     fn to_dyn(self) -> Arc<dyn AsyncExecDyn>
     where
@@ -237,7 +237,7 @@ impl<FT: std::ops::Deref<Target = T> + Send + Sync + 'static, T: AsyncExec> Asyn
     fn block_on<F, R>(&self, f: F) -> R
     where
         F: Future<Output = R> + Send,
-        R: Send + 'static,
+        R: 'static,
     {
         T::block_on(self, f)
     }
