@@ -1,6 +1,6 @@
 [package]
 name = "orb-smol"
-version = "0.8.0"
+version = "0.9.0"
 edition = "2024"
 authors = ["plan <frostyplanet@gmail.com>"]
 categories = ["concurrency", "network-programming"]
@@ -15,8 +15,8 @@ Orb is an abstraction for writing runtime agnostic async code.
 """
 
 [dependencies]
+orb = { path = "../", version=">=0.9" }
 futures-lite = "2.6"
-orb = { path = "../", version=">=0.8" }
 async-io = "2.6"
 async-executor = "1"
 smol = {version="2", optional=true}
