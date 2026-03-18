@@ -3,7 +3,10 @@ use orb::prelude::*;
 use orb_smol::SmolRT;
 use orb_test_utils::{runtime::*, time::*, *};
 use rstest::*;
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering},
+};
 use std::time::Duration;
 
 #[fixture]
@@ -25,15 +28,60 @@ fn test_smol_global(setup: ()) {
 }
 
 #[rstest]
+fn test_smol_one(setup: ()) {
+    let rt = SmolRT::one();
+    let counter = Arc::new(AtomicUsize::new(0));
+    let _counter = counter.clone();
+    rt.spawn(async move {
+        loop {
+            SmolRT::sleep(Duration::from_secs(1)).await;
+            _counter.fetch_add(1, Ordering::SeqCst);
+            println!("back sleep");
+        }
+    });
+    // background future only runs within the lifecycle on block_on
+    rt.block_on(SmolRT::sleep(Duration::from_secs(3)));
+    let mut rx_count = counter.load(Ordering::SeqCst);
+    assert!(rx_count >= 2 && rx_count <= 4, "{rx_count}");
+    for i in 0..5 {
+        std::thread::sleep(Duration::from_secs(1));
+        println!("front sleep {i}");
+    }
+    rx_count = counter.load(Ordering::SeqCst);
+    assert!(rx_count >= 6 && rx_count <= 9, "{rx_count}");
+}
+
+#[rstest]
 fn test_smol_rt_with_executor(setup: ()) {
     let _ = setup; // Explicitly ignore the fixture value
-    let rt = SmolRT::new(Arc::new(Executor::new()));
+    let rt = SmolRT::new_with_executor(Arc::new(Executor::new()));
     test_spawn_async(&rt);
     test_spawn_blocking::<SmolRT>(&rt);
     test_sleep(&rt);
     test_tick(&rt);
     test_tick_stream(&rt);
     test_boxed_async_handle(&rt);
+
+    println!("test blockon effect");
+    let counter = Arc::new(AtomicUsize::new(0));
+    let _counter = counter.clone();
+    rt.spawn(async move {
+        loop {
+            SmolRT::sleep(Duration::from_secs(1)).await;
+            _counter.fetch_add(1, Ordering::SeqCst);
+            println!("back sleep");
+        }
+    });
+    // background future only runs within the lifecycle on block_on
+    rt.block_on(SmolRT::sleep(Duration::from_secs(3)));
+    let mut rx_count = counter.load(Ordering::SeqCst);
+    assert!(rx_count >= 2 && rx_count <= 4, "{rx_count}");
+    for i in 0..5 {
+        std::thread::sleep(Duration::from_secs(1));
+        println!("front sleep {i}");
+    }
+    rx_count = counter.load(Ordering::SeqCst);
+    assert!(rx_count >= 2 && rx_count <= 4, "{rx_count}");
 }
 
 #[cfg(not(feature = "unwind"))]
@@ -41,7 +89,7 @@ fn test_smol_rt_with_executor(setup: ()) {
 #[should_panic]
 fn test_smol_rt_panic(setup: ()) {
     let _ = setup; // Explicitly ignore the fixture value
-    let rt = SmolRT::new(Arc::new(Executor::new()));
+    let rt = SmolRT::new_with_executor(Arc::new(Executor::new()));
     let _rt = rt.clone();
     // the panic hook will work, but the program will terminate
     rt.block_on(async move {

@@ -12,11 +12,11 @@ fn setup() {
 #[rstest]
 fn test_addr_resolve(setup: ()) {
     let _ = setup; // Explicitly ignore the fixture value
-    let rt = SmolRT::new(Arc::new(Executor::new()));
+    let rt = SmolRT::new_with_executor(Arc::new(Executor::new()));
     test_unify_addr_resolve::<SmolRT>(&rt);
 }
 #[rstest]
-#[case(SmolRT::new(std::sync::Arc::new(async_executor::Executor::new())))]
+#[case(SmolRT::new_with_executor(std::sync::Arc::new(async_executor::Executor::new())))]
 #[cfg(feature = "global")]
 #[case(SmolRT::new_global())]
 fn test_tcp(setup: (), #[case] rt: SmolRT) {
@@ -26,7 +26,7 @@ fn test_tcp(setup: (), #[case] rt: SmolRT) {
 }
 
 #[rstest]
-#[case(SmolRT::new(std::sync::Arc::new(async_executor::Executor::new())))]
+#[case(SmolRT::new_with_executor(std::sync::Arc::new(async_executor::Executor::new())))]
 #[cfg(feature = "global")]
 #[case(SmolRT::new_global())]
 fn test_unix(setup: (), #[case] rt: SmolRT) {

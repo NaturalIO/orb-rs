@@ -18,18 +18,49 @@
 //!
 //! ## Usage
 //!
+//! With multi thread runtime
+//!
+//! ```rust
+//! use orb_smol::SmolRT;
+//! use orb::prelude::*;
+//! use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+//! use std::time::Duration;
+//! let rt = SmolRT::multi(0); // spawn background thread with cpu number
+//! let counter = Arc::new(AtomicUsize::new(0));
+//! let _counter = counter.clone();
+//! rt.spawn(async move {
+//!     loop {
+//!         SmolRT::sleep(Duration::from_secs(1)).await;
+//!         _counter.fetch_add(1, Ordering::SeqCst);
+//!     }
+//! });
+//! // background task will continue to run until rt is drop
+//! std::thread::sleep(Duration::from_secs(3));
+//! drop(rt);
+//! let count = counter.load(Ordering::SeqCst);
+//! assert!(count >= 2 && count <= 4, "{count}");
+//! ```
+//!
+//!
 //! With a custom executor:
 //!
 //! ```rust
 //! use orb_smol::SmolRT;
+//! use orb::prelude::*;
 //! use std::sync::Arc;
 //! use async_executor::Executor;
 //!
 //! let executor = Arc::new(Executor::new());
-//! let rt = SmolRT::new(executor);
+//! let rt = SmolRT::new_with_executor(executor);
+//! rt.block_on(async move {
+//!     for _ in 0..3 {
+//!         SmolRT::sleep(std::time::Duration::from_secs(1)).await;
+//!     }
+//!     println!("background task will stop once the block_on is finish");
+//! });
 //! ```
 //!
-//! With the global executor (requires the `global` feature):
+//! With the smol global thread (requires the `global` feature):
 //!
 //! ```rust
 //! use orb_smol::SmolRT;
@@ -86,9 +117,14 @@ impl SmolRT {
         Self(None)
     }
 
-    /// spawn coroutine with specified Executor
+    /// spawn coroutine with specified Executor.
+    ///
+    /// # Safety
+    ///
+    /// You should run block_on on this executor somewhere (self.block_on also counts),
+    /// otherwise the future spawn into this executor will not run.
     #[inline]
-    pub fn new(executor: Arc<Executor<'static>>) -> Self {
+    pub fn new_with_executor(executor: Arc<Executor<'static>>) -> Self {
         Self(Some(SmolRTInner { ex: executor, _close_h: None }))
     }
 }
@@ -286,12 +322,7 @@ impl AsyncExec for SmolRT {
                 let _rx = rx.clone();
                 thread::Builder::new()
                     .name(format!("smol-{}", n))
-                    .spawn(move || {
-                        block_on(_ex.run(async move {
-                            _rx.recv();
-                            println!("thread exit");
-                        }))
-                    })
+                    .spawn(move || block_on(_ex.run(_rx.recv())))
                     .expect("cannot spawn executor thread");
             }
             Self(Some(inner))
@@ -347,7 +378,7 @@ impl AsyncExec for SmolRT {
     fn block_on<F, R>(&self, f: F) -> R
     where
         F: Future<Output = R> + Send,
-        R: Send + 'static,
+        R: 'static,
     {
         if let Some(inner) = &self.0 {
             block_on(inner.ex.run(f))
