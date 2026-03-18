@@ -40,6 +40,7 @@
 
 use async_executor::Executor;
 use async_io::{Async, Timer};
+use crossfire::{MAsyncRx, mpmc, null::CloseHandle};
 use futures_lite::{future::block_on, stream::StreamExt};
 use orb::io::{AsyncFd, AsyncIO};
 use orb::runtime::{AsyncExec, AsyncExecDyn, AsyncHandle, ThreadHandle};
@@ -47,20 +48,29 @@ use orb::time::{AsyncTime, TimeInterval};
 use std::fmt;
 use std::future::Future;
 use std::io;
-use std::net::SocketAddr;
-use std::net::TcpStream;
+use std::net::{SocketAddr, TcpStream};
+use std::num::NonZero;
 use std::ops::Deref;
-use std::os::fd::{AsFd, AsRawFd};
-use std::os::unix::net::UnixStream;
+use std::os::{
+    fd::{AsFd, AsRawFd},
+    unix::net::UnixStream,
+};
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::*;
+use std::thread;
 use std::time::{Duration, Instant};
 
 /// The SmolRT implements AsyncRuntime trait
 #[derive(Clone)]
-pub struct SmolRT(Option<Arc<Executor<'static>>>);
+pub struct SmolRT(Option<SmolRTInner>);
+
+#[derive(Clone)]
+struct SmolRTInner {
+    ex: Arc<Executor<'static>>,
+    _close_h: Option<CloseHandle<mpmc::Null>>,
+}
 
 impl fmt::Debug for SmolRT {
     #[inline]
@@ -79,7 +89,7 @@ impl SmolRT {
     /// spawn coroutine with specified Executor
     #[inline]
     pub fn new(executor: Arc<Executor<'static>>) -> Self {
-        Self(Some(executor))
+        Self(Some(SmolRTInner { ex: executor, _close_h: None }))
     }
 }
 
@@ -246,6 +256,48 @@ impl AsyncExec for SmolRT {
 
     type ThreadHandle<R: Send> = BlockingJoinHandle<R>;
 
+    #[inline(always)]
+    fn one() -> Self {
+        Self::multi(1)
+    }
+
+    #[inline(always)]
+    fn multi(mut size: usize) -> Self {
+        if size == 0 {
+            size = usize::from(
+                thread::available_parallelism().unwrap_or(NonZero::new(1usize).unwrap()),
+            )
+        }
+        #[cfg(feature = "global")]
+        {
+            unsafe { std::env::set_var("SMOL_THREADS", size.to_string()) };
+            Self(None)
+        }
+        #[cfg(not(feature = "global"))]
+        {
+            let (close_h, rx): (CloseHandle<mpmc::Null>, MAsyncRx<mpmc::Null>) = mpmc::new();
+            // Prevent spawning another thread by running the process driver on this thread.
+            let inner = SmolRTInner { ex: Arc::new(Executor::new()), _close_h: Some(close_h) };
+            #[cfg(not(target_os = "espidf"))]
+            inner.ex.spawn(async_process::driver()).detach();
+            let ex = inner.ex.clone();
+            for n in 1..=size {
+                let _ex = ex.clone();
+                let _rx = rx.clone();
+                thread::Builder::new()
+                    .name(format!("smol-{}", n))
+                    .spawn(move || {
+                        block_on(_ex.run(async move {
+                            _rx.recv();
+                            println!("thread exit");
+                        }))
+                    })
+                    .expect("cannot spawn executor thread");
+            }
+            Self(Some(inner))
+        }
+    }
+
     /// Spawn a task in the background
     fn spawn<F, R>(&self, f: F) -> Self::AsyncHandle<R>
     where
@@ -255,7 +307,7 @@ impl AsyncExec for SmolRT {
         // Although SmolJoinHandle don't need Send marker, but here in the spawn()
         // need to restrict the requirements
         let handle = match &self.0 {
-            Some(exec) => exec.spawn(unwind_wrap!(f)),
+            Some(inner) => inner.ex.spawn(unwind_wrap!(f)),
             None => {
                 #[cfg(feature = "global")]
                 {
@@ -297,8 +349,8 @@ impl AsyncExec for SmolRT {
         F: Future<Output = R> + Send,
         R: Send + 'static,
     {
-        if let Some(exec) = &self.0 {
-            block_on(exec.run(f))
+        if let Some(inner) = &self.0 {
+            block_on(inner.ex.run(f))
         } else {
             #[cfg(feature = "global")]
             {

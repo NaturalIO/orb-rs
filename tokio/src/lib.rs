@@ -160,6 +160,16 @@ impl AsyncExec for TokioRT {
 
     type ThreadHandle<R: Send> = TokioThreadHandle<R>;
 
+    #[inline(always)]
+    fn one() -> Self {
+        Self::new_current_thread()
+    }
+
+    #[inline(always)]
+    fn multi(num: usize) -> Self {
+        Self::new_multi_thread(num)
+    }
+
     /// Spawn a task in the background, returning a handle to await its result
     #[inline]
     fn spawn<F, R>(&self, f: F) -> Self::AsyncHandle<R>

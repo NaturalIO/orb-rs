@@ -37,6 +37,14 @@ pub trait AsyncExec: AsyncExecDyn + Send + Sync + 'static {
 
     type ThreadHandle<R: Send>: ThreadHandle<R> + Send;
 
+    /// Initiate one thread executor
+    fn one() -> Self;
+
+    /// Initiate multi thread executor.
+    ///
+    /// When `num` == 0, start threads that match cpu number
+    fn multi(num: usize) -> Self;
+
     /// Spawn a task in the background, returning a handle to await its result.
     ///
     /// This method creates a new task that runs concurrently with the current
@@ -187,6 +195,16 @@ impl<FT: std::ops::Deref<Target = T> + Send + Sync + 'static, T: AsyncExec> Asyn
     type AsyncHandle<R: Send> = T::AsyncHandle<R>;
 
     type ThreadHandle<R: Send> = T::ThreadHandle<R>;
+
+    /// We don't known the type, so this is unimplemented.
+    fn one() -> Self {
+        unimplemented!();
+    }
+
+    /// We don't known the type, so this is unimplemented.
+    fn multi(_size: usize) -> Self {
+        unimplemented!();
+    }
 
     #[inline(always)]
     fn spawn<F, R>(&self, f: F) -> Self::AsyncHandle<R>

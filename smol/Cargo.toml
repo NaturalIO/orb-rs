@@ -21,6 +21,11 @@ async-io = "2.6"
 async-executor = "1"
 smol = {version="2", optional=true}
 blocking = "1.6"
+crossfire = ">=3.0"
+
+[target.'cfg(not(target_os = "espidf"))'.dependencies]
+async-process = "2"
+
 
 [dev-dependencies]
 orb-test-utils = { path = "../test-utils" }
