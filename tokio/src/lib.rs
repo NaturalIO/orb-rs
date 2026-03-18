@@ -21,20 +21,22 @@ use orb::time::{AsyncTime, TimeInterval};
 use std::fmt;
 use std::future::Future;
 use std::io;
-use std::net::SocketAddr;
-use std::net::TcpStream;
+use std::net::{SocketAddr, TcpStream};
 use std::ops::Deref;
 use std::os::fd::{AsFd, AsRawFd};
 use std::os::unix::net::UnixStream;
 use std::path::Path;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::*;
 use std::time::{Duration, Instant};
 use tokio::runtime::{Builder, Handle, Runtime};
 
 /// The main struct for tokio runtime IO, assign this type to AsyncIO trait when used.
 pub enum TokioRT {
-    Runtime(Runtime),
+    // Runtime don't have clone, since we don't have thread context, we need to put runtime to Arc
+    // to impl Clone. (We usually need to clone self before calling block_on)
+    Runtime(Arc<Runtime>),
     Handle(Handle),
 }
 
@@ -52,7 +54,7 @@ impl TokioRT {
     /// Capture a runtime
     #[inline]
     pub fn new_with_runtime(rt: Runtime) -> Self {
-        Self::Runtime(rt)
+        Self::Runtime(Arc::new(rt))
     }
 
     #[inline]
@@ -61,13 +63,15 @@ impl TokioRT {
         if workers > 0 {
             builder.worker_threads(workers);
         }
-        Self::Runtime(builder.enable_all().build().unwrap())
+        let rt = builder.enable_all().build().unwrap();
+        Self::Runtime(Arc::new(rt))
     }
 
     #[inline]
     pub fn new_current_thread() -> Self {
         let mut builder = Builder::new_current_thread();
-        Self::Runtime(builder.enable_all().build().unwrap())
+        let rt = builder.enable_all().build().unwrap();
+        Self::Runtime(Arc::new(rt))
     }
 
     /// Only capture a runtime handle. Should acquire with
@@ -85,13 +89,7 @@ impl Clone for TokioRT {
             Self::Handle(h) => {
                 return Self::Handle(h.clone());
             }
-            Self::Runtime(r) => {
-                let handle = {
-                    let _guard = r.enter();
-                    Handle::current()
-                };
-                Self::Handle(handle)
-            }
+            Self::Runtime(rt) => Self::Runtime(rt.clone()),
         }
     }
 }
@@ -160,11 +158,34 @@ impl AsyncExec for TokioRT {
 
     type ThreadHandle<R: Send> = TokioThreadHandle<R>;
 
-    #[inline(always)]
-    fn one() -> Self {
+    /// Initiate executor using current thread.
+    ///
+    /// # Safety
+    ///
+    /// You should run [Self::block_on()] with this executor.
+    ///
+    /// If spawn without a `block_on()` running, it's possible
+    /// the runtime just init future without scheduling.
+    fn current() -> Self {
         Self::new_current_thread()
     }
 
+    /// Initiate executor with one background thread.
+    ///
+    /// # NOTE
+    ///
+    /// [Self::block_on()] is optional.
+    #[inline(always)]
+    fn one() -> Self {
+        Self::new_multi_thread(1)
+    }
+
+    /// Initiate executor with multiple background threads.
+    ///
+    /// # NOTE
+    ///
+    /// When `num` == 0, start threads that match cpu number
+    /// [Self::block_on()] is optional.
     #[inline(always)]
     fn multi(num: usize) -> Self {
         Self::new_multi_thread(num)

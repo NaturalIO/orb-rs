@@ -292,11 +292,35 @@ impl AsyncExec for SmolRT {
 
     type ThreadHandle<R: Send> = BlockingJoinHandle<R>;
 
+    /// Initiate executor using current thread.
+    ///
+    /// # Safety
+    ///
+    /// You should run [Self::block_on()] with this executor.
+    ///
+    /// If spawn without a `block_on()` running, it's possible
+    /// the runtime just init future without scheduling.
+    #[inline(always)]
+    fn current() -> Self {
+        Self::new_with_executor(Arc::new(Executor::new()))
+    }
+
+    /// Initiate executor with one background thread.
+    ///
+    /// # NOTE
+    ///
+    /// [Self::block_on()] is optional.
     #[inline(always)]
     fn one() -> Self {
         Self::multi(1)
     }
 
+    /// Initiate executor with multiple background threads.
+    ///
+    /// # NOTE
+    ///
+    /// When `num` == 0, start threads that match cpu number
+    /// [Self::block_on()] is optional.
     #[inline(always)]
     fn multi(mut size: usize) -> Self {
         if size == 0 {

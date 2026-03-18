@@ -16,7 +16,9 @@ fn test_addr_resolve(setup: ()) {
     test_unify_addr_resolve::<SmolRT>(&rt);
 }
 #[rstest]
-#[case(SmolRT::new_with_executor(std::sync::Arc::new(async_executor::Executor::new())))]
+#[case(SmolRT::current())]
+#[case(SmolRT::one())]
+#[case(SmolRT::multi(0))]
 #[cfg(feature = "global")]
 #[case(SmolRT::new_global())]
 fn test_tcp(setup: (), #[case] rt: SmolRT) {
@@ -26,7 +28,9 @@ fn test_tcp(setup: (), #[case] rt: SmolRT) {
 }
 
 #[rstest]
-#[case(SmolRT::new_with_executor(std::sync::Arc::new(async_executor::Executor::new())))]
+#[case(SmolRT::current())]
+#[case(SmolRT::one())]
+#[case(SmolRT::multi(0))]
 #[cfg(feature = "global")]
 #[case(SmolRT::new_global())]
 fn test_unix(setup: (), #[case] rt: SmolRT) {

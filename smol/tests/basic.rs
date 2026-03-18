@@ -28,7 +28,34 @@ fn test_smol_global(setup: ()) {
 }
 
 #[rstest]
+fn test_smol_current(setup: ()) {
+    let _ = setup;
+    println!("test blockon effect");
+    let counter = Arc::new(AtomicUsize::new(0));
+    let _counter = counter.clone();
+    let rt = SmolRT::current();
+    rt.spawn(async move {
+        loop {
+            SmolRT::sleep(Duration::from_secs(1)).await;
+            _counter.fetch_add(1, Ordering::SeqCst);
+            println!("back sleep");
+        }
+    });
+    // background future only runs within the lifecycle on block_on
+    rt.block_on(SmolRT::sleep(Duration::from_secs(3)));
+    let mut rx_count = counter.load(Ordering::SeqCst);
+    assert!(rx_count >= 2 && rx_count <= 4, "{rx_count}");
+    for i in 0..5 {
+        std::thread::sleep(Duration::from_secs(1));
+        println!("front sleep {i}");
+    }
+    rx_count = counter.load(Ordering::SeqCst);
+    assert!(rx_count >= 2 && rx_count <= 4, "{rx_count}");
+}
+
+#[rstest]
 fn test_smol_one(setup: ()) {
+    let _ = setup;
     let rt = SmolRT::one();
     let counter = Arc::new(AtomicUsize::new(0));
     let _counter = counter.clone();
@@ -61,27 +88,6 @@ fn test_smol_rt_with_executor(setup: ()) {
     test_tick(&rt);
     test_tick_stream(&rt);
     test_boxed_async_handle(&rt);
-
-    println!("test blockon effect");
-    let counter = Arc::new(AtomicUsize::new(0));
-    let _counter = counter.clone();
-    rt.spawn(async move {
-        loop {
-            SmolRT::sleep(Duration::from_secs(1)).await;
-            _counter.fetch_add(1, Ordering::SeqCst);
-            println!("back sleep");
-        }
-    });
-    // background future only runs within the lifecycle on block_on
-    rt.block_on(SmolRT::sleep(Duration::from_secs(3)));
-    let mut rx_count = counter.load(Ordering::SeqCst);
-    assert!(rx_count >= 2 && rx_count <= 4, "{rx_count}");
-    for i in 0..5 {
-        std::thread::sleep(Duration::from_secs(1));
-        println!("front sleep {i}");
-    }
-    rx_count = counter.load(Ordering::SeqCst);
-    assert!(rx_count >= 2 && rx_count <= 4, "{rx_count}");
 }
 
 #[cfg(not(feature = "unwind"))]

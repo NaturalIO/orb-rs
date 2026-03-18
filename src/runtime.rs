@@ -37,12 +37,29 @@ pub trait AsyncExec: AsyncExecDyn + Send + Sync + 'static {
 
     type ThreadHandle<R: Send>: ThreadHandle<R> + Send;
 
-    /// Initiate one thread executor
+    /// Initiate executor using current thread.
+    ///
+    /// # Safety
+    ///
+    /// You should run [Self::block_on()] with this executor.
+    ///
+    /// If spawn without a `block_on()` running, it's possible
+    /// the runtime just init future without scheduling.
+    fn current() -> Self;
+
+    /// Initiate executor with one background thread.
+    ///
+    /// # NOTE
+    ///
+    /// [Self::block_on()] is optional.
     fn one() -> Self;
 
-    /// Initiate multi thread executor.
+    /// Initiate executor with multiple background threads.
+    ///
+    /// # NOTE
     ///
     /// When `num` == 0, start threads that match cpu number
+    /// [Self::block_on()] is optional.
     fn multi(num: usize) -> Self;
 
     /// Spawn a task in the background, returning a handle to await its result.
@@ -203,6 +220,11 @@ impl<FT: std::ops::Deref<Target = T> + Send + Sync + 'static, T: AsyncExec> Asyn
 
     /// We don't known the type, so this is unimplemented.
     fn multi(_size: usize) -> Self {
+        unimplemented!();
+    }
+
+    /// We don't known the type, so this is unimplemented.
+    fn current() -> Self {
         unimplemented!();
     }
 
