@@ -203,34 +203,6 @@ pub trait AsyncFd<T: AsRawFd + AsFd + Send + Sync + 'static>:
     ) -> impl Future<Output = io::Result<R>> + Send;
 }
 
-impl<F: std::ops::Deref<Target = IO>, IO: AsyncIO> AsyncIO for F {
-    type AsyncFd<T: AsRawFd + AsFd + Send + Sync + 'static> = IO::AsyncFd<T>;
-
-    fn connect_tcp(
-        addr: &SocketAddr,
-    ) -> impl Future<Output = io::Result<Self::AsyncFd<TcpStream>>> + Send {
-        IO::connect_tcp(addr)
-    }
-
-    fn connect_unix(
-        addr: &Path,
-    ) -> impl Future<Output = io::Result<Self::AsyncFd<UnixStream>>> + Send {
-        IO::connect_unix(addr)
-    }
-
-    fn to_async_fd_rd<T: AsRawFd + AsFd + Send + Sync + 'static>(
-        fd: T,
-    ) -> io::Result<Self::AsyncFd<T>> {
-        IO::to_async_fd_rd(fd)
-    }
-
-    fn to_async_fd_rw<T: AsRawFd + AsFd + Send + Sync + 'static>(
-        fd: T,
-    ) -> io::Result<Self::AsyncFd<T>> {
-        IO::to_async_fd_rw(fd)
-    }
-}
-
 /// AsyncRead trait for runtime adapter
 pub trait AsyncRead: Send {
     /// Async version of read function

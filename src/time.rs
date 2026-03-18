@@ -75,20 +75,6 @@ pub trait AsyncTime {
     }
 }
 
-impl<F: std::ops::Deref<Target = T>, T: AsyncTime> AsyncTime for F {
-    type Interval = T::Interval;
-
-    #[inline(always)]
-    fn sleep(d: Duration) -> impl Future + Send {
-        T::sleep(d)
-    }
-
-    #[inline(always)]
-    fn interval(d: Duration) -> Self::Interval {
-        T::interval(d)
-    }
-}
-
 /// Trait for periodic timers.
 ///
 /// This trait defines the interface for periodic timers that can be used

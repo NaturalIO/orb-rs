@@ -28,23 +28,8 @@
 //!
 //! ### Cloning
 //!
-//! Both `TokioRT` and `SmolRT` have impl Clone, but [AsyncRuntime] and [AsyncExec] does not
-//! include Clone because not sure about other runtime. you may explicitly mark Clone with our
-//! trait marker.
-//!
-//! ## Inherence
-//!
-//! You can write your own trait by inheriting AsyncRuntime or any other trait, to provide extra
-//! functions along with the runtime object.
-//! There's an blanket trait to auto impl AsyncRuntime on anything that is `Deref<Target>` to an AsyncRuntime.
-//!
-//! ``` no_compile
-//! pub trait AsyncRuntime: AsyncExec + AsyncIO + AsyncTime {}
-//!
-//! impl<F: std::ops::Deref<Target = T> + Send + Sync + 'static, T: AsyncRuntime> AsyncRuntime for F {}
-//! ```
-//! Simimlar blanket trait can be found on other sub traits.
-
+//! Since [AsyncExec] cannot know the runtime type within thread-local context, we have impl Clone
+//! for AsyncExec. It's common practice to Clone the runtime instance and pass it through `block_on`.
 pub mod io;
 pub mod net;
 pub mod runtime;
@@ -76,5 +61,3 @@ use prelude::*;
 /// functions along with the runtime object.
 /// There's an blanket trait to auto impl AsyncRuntime on anything that is `Deref<Target>` to an AsyncRuntime.
 pub trait AsyncRuntime: AsyncExec + AsyncIO + AsyncTime {}
-
-impl<F: std::ops::Deref<Target = T> + Send + Sync + 'static, T: AsyncRuntime> AsyncRuntime for F {}

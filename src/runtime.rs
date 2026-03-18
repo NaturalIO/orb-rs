@@ -32,7 +32,7 @@ use std::sync::Arc;
 ///     }
 /// }
 /// ```
-pub trait AsyncExec: AsyncExecDyn + Send + Sync + 'static {
+pub trait AsyncExec: AsyncExecDyn + Send + Sync + 'static + Clone {
     type AsyncHandle<R: Send>: AsyncHandle<R>;
 
     type ThreadHandle<R: Send>: ThreadHandle<R> + Send;
@@ -199,70 +199,6 @@ pub trait AsyncExecDyn: Send + Sync + 'static {
     ///
     /// * `f` - The future to spawn
     fn spawn_detach_dyn(&self, f: Box<dyn Future<Output = ()> + Send + Unpin>);
-}
-
-impl<FT: std::ops::Deref<Target = T> + Send + Sync + 'static, T: AsyncExec> AsyncExecDyn for FT {
-    #[inline]
-    fn spawn_detach_dyn(&self, f: Box<dyn Future<Output = ()> + Send + Unpin>) {
-        T::spawn_detach_dyn(self.deref(), f)
-    }
-}
-
-impl<FT: std::ops::Deref<Target = T> + Send + Sync + 'static, T: AsyncExec> AsyncExec for FT {
-    type AsyncHandle<R: Send> = T::AsyncHandle<R>;
-
-    type ThreadHandle<R: Send> = T::ThreadHandle<R>;
-
-    /// We don't known the type, so this is unimplemented.
-    fn one() -> Self {
-        unimplemented!();
-    }
-
-    /// We don't known the type, so this is unimplemented.
-    fn multi(_size: usize) -> Self {
-        unimplemented!();
-    }
-
-    /// We don't known the type, so this is unimplemented.
-    fn current() -> Self {
-        unimplemented!();
-    }
-
-    #[inline(always)]
-    fn spawn<F, R>(&self, f: F) -> Self::AsyncHandle<R>
-    where
-        F: Future<Output = R> + Send + 'static,
-        R: Send + 'static,
-    {
-        T::spawn(self.deref(), f)
-    }
-
-    #[inline(always)]
-    fn spawn_detach<F, R>(&self, f: F)
-    where
-        F: Future<Output = R> + Send + 'static,
-        R: Send + 'static,
-    {
-        T::spawn_detach(self.deref(), f)
-    }
-
-    #[inline(always)]
-    fn spawn_blocking<F, R>(f: F) -> Self::ThreadHandle<R>
-    where
-        F: FnOnce() -> R + Send + 'static,
-        R: Send + 'static,
-    {
-        T::spawn_blocking(f)
-    }
-
-    #[inline(always)]
-    fn block_on<F, R>(&self, f: F) -> R
-    where
-        F: Future<Output = R> + Send,
-        R: 'static,
-    {
-        T::block_on(self, f)
-    }
 }
 
 /// A handle for managing spawned async tasks.
