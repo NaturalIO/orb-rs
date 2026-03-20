@@ -21,6 +21,6 @@ pin-project-lite = "0.2"
 futures-lite = "2.6"
 
 [dev-dependencies]
-rand = "0.8"
+fastrand = "2.3"
 async-executor = "1"
 orb-smol = {version="0", path="smol"}

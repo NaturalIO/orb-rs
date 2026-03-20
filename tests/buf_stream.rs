@@ -1,6 +1,7 @@
+use orb::AsyncRuntime;
 use orb::io::AsyncBufStream;
 use orb::prelude::*;
-use rand::{Rng, RngCore};
+use orb_smol::SmolRT;
 use std::future::Future;
 use std::io;
 use std::sync::{Arc, Mutex};
@@ -49,13 +50,12 @@ impl AsyncRead for MockReadStream {
                     if *pos >= data.len() {
                         return Ok(0); // True EOF
                     }
-                    let mut rng = rand::thread_rng();
                     let remaining = data.len() - *pos;
                     let max_read = std::cmp::min(buf.len(), remaining);
                     if max_read == 0 {
                         return Ok(0);
                     }
-                    let read_size = rng.gen_range(1..=max_read);
+                    let read_size = fastrand::usize(1..=max_read);
 
                     buf[..read_size].copy_from_slice(&data[*pos..*pos + read_size]);
                     *pos += read_size;
@@ -100,9 +100,8 @@ impl AsyncWrite for MockWriteStream {
                 buf.len()
             } else {
                 // In random mode, sometimes do short writes
-                let mut rng = rand::thread_rng();
                 // Using a 50% chance for short writes to make it more likely to occur in tests.
-                if rng.gen_bool(0.5) { rng.gen_range(1..=buf.len()) } else { buf.len() }
+                if fastrand::bool() { fastrand::usize(1..=buf.len()) } else { buf.len() }
             };
 
             self.write_buffer.lock().unwrap().extend_from_slice(&buf[..n]);
@@ -113,249 +112,267 @@ impl AsyncWrite for MockWriteStream {
 
 // ==================== DETERMINISTIC TESTS ====================
 
-#[tokio::test]
-async fn test_async_read_exact_fixed_chunks() {
-    // Use fixed, deterministic values
-    let data_size = 2048;
-    let mut source_data = vec![0u8; data_size];
-    // Fill with deterministic pattern
-    for i in 0..data_size {
-        source_data[i] = (i % 256) as u8;
-    }
+#[test]
+fn test_async_read_exact_fixed_chunks() {
+    SmolRT::current().block_on(async {
+        // Use fixed, deterministic values
+        let data_size = 2048;
+        let mut source_data = vec![0u8; data_size];
+        // Fill with deterministic pattern
+        for i in 0..data_size {
+            source_data[i] = (i % 256) as u8;
+        }
 
-    // Create fixed chunks
-    let chunks = vec![
-        source_data[0..512].to_vec(),
-        source_data[512..1024].to_vec(),
-        source_data[1024..1536].to_vec(),
-        source_data[1536..2048].to_vec(),
-    ];
+        // Create fixed chunks
+        let chunks = vec![
+            source_data[0..512].to_vec(),
+            source_data[512..1024].to_vec(),
+            source_data[1024..1536].to_vec(),
+            source_data[1536..2048].to_vec(),
+        ];
 
-    let mut read_stream = MockReadStream::new_chunked_reader_deterministic(chunks);
+        let mut read_stream = MockReadStream::new_chunked_reader_deterministic(chunks);
 
-    let mut out = vec![0u8; data_size];
-    read_stream.read_exact(&mut out).await.unwrap();
-    assert_eq!(out, source_data);
+        let mut out = vec![0u8; data_size];
+        read_stream.read_exact(&mut out).await.unwrap();
+        assert_eq!(out, source_data);
+    });
 }
 
-#[tokio::test]
-async fn test_async_read_bypass_fixed() {
-    // Use fixed, deterministic values
-    let data_size = 300; // > 256 to test bypass
-    let mut source_data = vec![0u8; data_size];
-    // Fill with deterministic pattern
-    for i in 0..data_size {
-        source_data[i] = (i % 256) as u8;
-    }
+#[test]
+fn test_async_read_bypass_fixed() {
+    SmolRT::current().block_on(async {
+        // Use fixed, deterministic values
+        let data_size = 300; // > 256 to test bypass
+        let mut source_data = vec![0u8; data_size];
+        // Fill with deterministic pattern
+        for i in 0..data_size {
+            source_data[i] = (i % 256) as u8;
+        }
 
-    let mut read_stream =
-        MockReadStream::new_chunked_reader_deterministic(vec![source_data.clone()]);
+        let mut read_stream =
+            MockReadStream::new_chunked_reader_deterministic(vec![source_data.clone()]);
 
-    let mut out = vec![0u8; data_size];
-    read_stream.read_exact(&mut out).await.unwrap();
-    assert_eq!(out, source_data);
+        let mut out = vec![0u8; data_size];
+        read_stream.read_exact(&mut out).await.unwrap();
+        assert_eq!(out, source_data);
+    });
 }
 
-#[tokio::test]
-async fn test_async_read_multiple_reads_fixed() {
-    // Use fixed, deterministic values
-    let chunk1_data = vec![1u8; 100];
-    let chunk2_data = vec![2u8; 100];
+#[test]
+fn test_async_read_multiple_reads_fixed() {
+    SmolRT::current().block_on(async {
+        // Use fixed, deterministic values
+        let chunk1_data = vec![1u8; 100];
+        let chunk2_data = vec![2u8; 100];
 
-    let chunks = vec![chunk1_data.clone(), chunk2_data.clone()];
-    let mut read_stream = MockReadStream::new_chunked_reader_deterministic(chunks);
+        let chunks = vec![chunk1_data.clone(), chunk2_data.clone()];
+        let mut read_stream = MockReadStream::new_chunked_reader_deterministic(chunks);
 
-    let mut out1 = vec![0u8; 100];
-    read_stream.read_exact(&mut out1).await.unwrap();
-    assert_eq!(out1, chunk1_data);
+        let mut out1 = vec![0u8; 100];
+        read_stream.read_exact(&mut out1).await.unwrap();
+        assert_eq!(out1, chunk1_data);
 
-    let mut out2 = vec![0u8; 100];
-    read_stream.read_exact(&mut out2).await.unwrap();
-    assert_eq!(out2, chunk2_data);
+        let mut out2 = vec![0u8; 100];
+        read_stream.read_exact(&mut out2).await.unwrap();
+        assert_eq!(out2, chunk2_data);
+    });
 }
 
-#[tokio::test]
-async fn test_async_write_all_buffering_deterministic() {
-    let data_handle = Arc::new(Mutex::new(Vec::new()));
-    let mock_stream = MockWriteStream::new(data_handle.clone(), true); // deterministic = true
-    let mut writer = AsyncBufStream::new(mock_stream, 8);
+#[test]
+fn test_async_write_all_buffering_deterministic() {
+    SmolRT::current().block_on(async {
+        let data_handle = Arc::new(Mutex::new(Vec::new()));
+        let mock_stream = MockWriteStream::new(data_handle.clone(), true); // deterministic = true
+        let mut writer = AsyncBufStream::new(mock_stream, 8);
 
-    writer.write_all(b"hello").await.unwrap();
-    {
-        assert!(data_handle.lock().unwrap().is_empty()); // buffered
-    }
-    writer.write_all(b" wo").await.unwrap(); // total 5+3=8, should not flush yet
-    {
-        assert!(data_handle.lock().unwrap().is_empty()); // still buffered, pos is 8
-    }
+        writer.write_all(b"hello").await.unwrap();
+        {
+            assert!(data_handle.lock().unwrap().is_empty()); // buffered
+        }
+        writer.write_all(b" wo").await.unwrap(); // total 5+3=8, should not flush yet
+        {
+            assert!(data_handle.lock().unwrap().is_empty()); // still buffered, pos is 8
+        }
 
-    writer.write_all(b"rld").await.unwrap(); // overflows buffer
-    // "hello wo" should be flushed.
-    {
-        assert_eq!(*data_handle.lock().unwrap(), b"hello wo");
-    }
-    // "rld" is in the buffer
+        writer.write_all(b"rld").await.unwrap(); // overflows buffer
+        // "hello wo" should be flushed.
+        {
+            assert_eq!(*data_handle.lock().unwrap(), b"hello wo");
+        }
+        // "rld" is in the buffer
 
-    writer.flush().await.unwrap();
-    {
-        assert_eq!(*data_handle.lock().unwrap(), b"hello world");
-    }
+        writer.flush().await.unwrap();
+        {
+            assert_eq!(*data_handle.lock().unwrap(), b"hello world");
+        }
+    });
 }
 
-#[tokio::test]
-async fn test_async_write_bypass_deterministic() {
-    let data_handle = Arc::new(Mutex::new(Vec::new()));
-    let mock_stream = MockWriteStream::new(data_handle.clone(), true); // deterministic = true
-    let mut writer = AsyncBufStream::new(mock_stream, 8);
+#[test]
+fn test_async_write_bypass_deterministic() {
+    SmolRT::current().block_on(async {
+        let data_handle = Arc::new(Mutex::new(Vec::new()));
+        let mock_stream = MockWriteStream::new(data_handle.clone(), true); // deterministic = true
+        let mut writer = AsyncBufStream::new(mock_stream, 8);
 
-    writer.write_all(b"abc").await.unwrap();
-    {
-        assert!(data_handle.lock().unwrap().is_empty()); // buffered
-    }
-    // This write is larger than the buffer, it should bypass it.
-    writer.write_all(b"this is a long line").await.unwrap();
-    // The buffer "abc" should be flushed first.
-    // Then "this is a long line" is written directly.
-    {
-        assert_eq!(*data_handle.lock().unwrap(), b"abcthis is a long line");
-    }
+        writer.write_all(b"abc").await.unwrap();
+        {
+            assert!(data_handle.lock().unwrap().is_empty()); // buffered
+        }
+        // This write is larger than the buffer, it should bypass it.
+        writer.write_all(b"this is a long line").await.unwrap();
+        // The buffer "abc" should be flushed first.
+        // Then "this is a long line" is written directly.
+        {
+            assert_eq!(*data_handle.lock().unwrap(), b"abcthis is a long line");
+        }
 
-    writer.flush().await.unwrap();
-    {
-        assert_eq!(*data_handle.lock().unwrap(), b"abcthis is a long line");
-    }
+        writer.flush().await.unwrap();
+        {
+            assert_eq!(*data_handle.lock().unwrap(), b"abcthis is a long line");
+        }
+    });
 }
 
 // ==================== RANDOMIZED TESTS ====================
 
-#[tokio::test]
-async fn test_async_read_exact_random_chunks() {
-    let mut rng = rand::thread_rng();
-    let data_size = rng.gen_range(1024..4096);
-    let mut source_data = vec![0u8; data_size];
-    rng.fill_bytes(&mut source_data);
+#[test]
+fn test_async_read_exact_random_chunks() {
+    SmolRT::current().block_on(async {
+        let data_size = fastrand::usize(1024..4096);
+        let mut source_data = vec![0u8; data_size];
+        fastrand::fill(&mut source_data);
 
-    let mut chunks = Vec::new();
-    let mut remaining_data = &source_data[..];
-    while !remaining_data.is_empty() {
-        let chunk_size = rng.gen_range(1..128).min(remaining_data.len());
-        chunks.push(remaining_data[..chunk_size].to_vec());
-        remaining_data = &remaining_data[chunk_size..];
-    }
-
-    let mut read_stream = MockReadStream::new_chunked_reader(chunks);
-
-    let mut out = vec![0u8; data_size];
-    read_stream.read_exact(&mut out).await.unwrap();
-    assert_eq!(out, source_data);
-}
-
-#[tokio::test]
-async fn test_async_read_bypass_random() {
-    let mut rng = rand::thread_rng();
-    let data_size = rng.gen_range(257..512);
-    let mut source_data = vec![0u8; data_size];
-    rng.fill_bytes(&mut source_data);
-
-    let mut read_stream = MockReadStream::new_chunked_reader(vec![source_data.clone()]);
-
-    let mut out = vec![0u8; data_size];
-    read_stream.read_exact(&mut out).await.unwrap();
-    assert_eq!(out, source_data);
-}
-
-#[tokio::test]
-async fn test_async_read_multiple_reads_random() {
-    let mut rng = rand::thread_rng();
-    let chunk1_size = rng.gen_range(64..128);
-    let mut chunk1_data = vec![0u8; chunk1_size];
-    rng.fill_bytes(&mut chunk1_data);
-
-    let chunk2_size = rng.gen_range(64..128);
-    let mut chunk2_data = vec![0u8; chunk2_size];
-    rng.fill_bytes(&mut chunk2_data);
-
-    let chunks = vec![chunk1_data.clone(), chunk2_data.clone()];
-    let mut read_stream = MockReadStream::new_chunked_reader(chunks);
-
-    let mut out1 = vec![0u8; chunk1_size];
-    read_stream.read_exact(&mut out1).await.unwrap();
-    assert_eq!(out1, chunk1_data);
-
-    let mut out2 = vec![0u8; chunk2_size];
-    read_stream.read_exact(&mut out2).await.unwrap();
-    assert_eq!(out2, chunk2_data);
-}
-
-#[tokio::test]
-async fn test_random_read_sizes_and_returns() {
-    let mut rng = rand::thread_rng();
-    let data_size = rng.gen_range(8192..16384);
-    let mut source_data = vec![0u8; data_size];
-    rng.fill_bytes(&mut source_data);
-
-    let mut read_stream = MockReadStream::new_randomized_reader(source_data.clone());
-
-    let mut result_data = Vec::with_capacity(data_size);
-    while result_data.len() < data_size {
-        let read_size = rng.gen_range(1..=512);
-        let mut temp_buf = vec![0u8; read_size];
-        match read_stream.read(&mut temp_buf).await {
-            Ok(0) => break, // EOF
-            Ok(n) => {
-                result_data.extend_from_slice(&temp_buf[..n]);
-            }
-            Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
-            Err(e) => panic!("Read failed: {}", e),
+        let mut chunks = Vec::new();
+        let mut remaining_data = &source_data[..];
+        while !remaining_data.is_empty() {
+            let chunk_size = fastrand::usize(1..128).min(remaining_data.len());
+            chunks.push(remaining_data[..chunk_size].to_vec());
+            remaining_data = &remaining_data[chunk_size..];
         }
-    }
 
-    assert_eq!(result_data.len(), data_size);
-    assert_eq!(result_data, source_data);
+        let mut read_stream = MockReadStream::new_chunked_reader(chunks);
+
+        let mut out = vec![0u8; data_size];
+        read_stream.read_exact(&mut out).await.unwrap();
+        assert_eq!(out, source_data);
+    });
 }
 
-#[tokio::test]
-async fn test_async_write_all_buffering_random() {
-    let data_handle = Arc::new(Mutex::new(Vec::new()));
-    let mock_stream = MockWriteStream::new(data_handle.clone(), false); // deterministic = false
-    let mut writer = AsyncBufStream::new(mock_stream, 8);
+#[test]
+fn test_async_read_bypass_random() {
+    SmolRT::current().block_on(async {
+        let data_size = fastrand::usize(257..512);
+        let mut source_data = vec![0u8; data_size];
+        fastrand::fill(&mut source_data);
 
-    writer.write_all(b"hello").await.unwrap();
-    {
-        assert!(data_handle.lock().unwrap().is_empty()); // buffered
-    }
-    writer.write_all(b" wo").await.unwrap(); // total 5+3=8, should not flush yet
-    {
-        assert!(data_handle.lock().unwrap().is_empty()); // still buffered, pos is 8
-    }
+        let mut read_stream = MockReadStream::new_chunked_reader(vec![source_data.clone()]);
 
-    writer.write_all(b"rld").await.unwrap(); // overflows buffer
-    // "hello wo" should be flushed.
-    {
-        assert_eq!(*data_handle.lock().unwrap(), b"hello wo");
-        // "rld" is in the buffer
-    }
-    writer.flush().await.unwrap();
-    {
-        assert_eq!(*data_handle.lock().unwrap(), b"hello world");
-    }
+        let mut out = vec![0u8; data_size];
+        read_stream.read_exact(&mut out).await.unwrap();
+        assert_eq!(out, source_data);
+    });
 }
 
-#[tokio::test]
-async fn test_async_write_bypass_random() {
-    let data_handle = Arc::new(Mutex::new(Vec::new()));
-    let mock_stream = MockWriteStream::new(data_handle.clone(), false); // deterministic = false
-    let mut writer = AsyncBufStream::new(mock_stream, 8);
+#[test]
+fn test_async_read_multiple_reads_random() {
+    SmolRT::current().block_on(async {
+        let chunk1_size = fastrand::usize(64..128);
+        let mut chunk1_data = vec![0u8; chunk1_size];
+        fastrand::fill(&mut chunk1_data);
 
-    writer.write_all(b"abc").await.unwrap();
-    {
-        assert!(data_handle.lock().unwrap().is_empty()); // buffered
-    }
-    // This write is larger than the buffer, it should bypass it.
-    writer.write_all(b"this is a long line").await.unwrap();
-    // due to short writes, the behavior cannot be assert
-    writer.flush().await.unwrap();
-    {
-        assert_eq!(*data_handle.lock().unwrap(), b"abcthis is a long line");
-    }
+        let chunk2_size = fastrand::usize(64..128);
+        let mut chunk2_data = vec![0u8; chunk2_size];
+        fastrand::fill(&mut chunk2_data);
+
+        let chunks = vec![chunk1_data.clone(), chunk2_data.clone()];
+        let mut read_stream = MockReadStream::new_chunked_reader(chunks);
+
+        let mut out1 = vec![0u8; chunk1_size];
+        read_stream.read_exact(&mut out1).await.unwrap();
+        assert_eq!(out1, chunk1_data);
+
+        let mut out2 = vec![0u8; chunk2_size];
+        read_stream.read_exact(&mut out2).await.unwrap();
+        assert_eq!(out2, chunk2_data);
+    });
+}
+
+#[test]
+fn test_random_read_sizes_and_returns() {
+    SmolRT::current().block_on(async {
+        let data_size = fastrand::usize(8192..16384);
+        let mut source_data = vec![0u8; data_size];
+        fastrand::fill(&mut source_data);
+
+        let mut read_stream = MockReadStream::new_randomized_reader(source_data.clone());
+
+        let mut result_data = Vec::with_capacity(data_size);
+        while result_data.len() < data_size {
+            let read_size = fastrand::usize(1..=512);
+            let mut temp_buf = vec![0u8; read_size];
+            match read_stream.read(&mut temp_buf).await {
+                Ok(0) => break, // EOF
+                Ok(n) => {
+                    result_data.extend_from_slice(&temp_buf[..n]);
+                }
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                Err(e) => panic!("Read failed: {}", e),
+            }
+        }
+
+        assert_eq!(result_data.len(), data_size);
+        assert_eq!(result_data, source_data);
+    });
+}
+
+#[test]
+fn test_async_write_all_buffering_random() {
+    SmolRT::current().block_on(async {
+        let data_handle = Arc::new(Mutex::new(Vec::new()));
+        let mock_stream = MockWriteStream::new(data_handle.clone(), false); // deterministic = false
+        let mut writer = AsyncBufStream::new(mock_stream, 8);
+
+        writer.write_all(b"hello").await.unwrap();
+        {
+            assert!(data_handle.lock().unwrap().is_empty()); // buffered
+        }
+        writer.write_all(b" wo").await.unwrap(); // total 5+3=8, should not flush yet
+        {
+            assert!(data_handle.lock().unwrap().is_empty()); // still buffered, pos is 8
+        }
+
+        writer.write_all(b"rld").await.unwrap(); // overflows buffer
+        // "hello wo" should be flushed.
+        {
+            assert_eq!(*data_handle.lock().unwrap(), b"hello wo");
+            // "rld" is in the buffer
+        }
+        writer.flush().await.unwrap();
+        {
+            assert_eq!(*data_handle.lock().unwrap(), b"hello world");
+        }
+    });
+}
+
+#[test]
+fn test_async_write_bypass_random() {
+    SmolRT::current().block_on(async {
+        let data_handle = Arc::new(Mutex::new(Vec::new()));
+        let mock_stream = MockWriteStream::new(data_handle.clone(), false); // deterministic = false
+        let mut writer = AsyncBufStream::new(mock_stream, 8);
+
+        writer.write_all(b"abc").await.unwrap();
+        {
+            assert!(data_handle.lock().unwrap().is_empty()); // buffered
+        }
+        // This write is larger than the buffer, it should bypass it.
+        writer.write_all(b"this is a long line").await.unwrap();
+        // due to short writes, the behavior cannot be assert
+        writer.flush().await.unwrap();
+        {
+            assert_eq!(*data_handle.lock().unwrap(), b"abcthis is a long line");
+        }
+    });
 }
