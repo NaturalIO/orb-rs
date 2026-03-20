@@ -1,5 +1,5 @@
 //pub mod bounded;
-pub mod unbounded;
+mod unbounded;
 
 use crate::prelude::*;
 pub use unbounded::WorkerPoolUnbounded;
