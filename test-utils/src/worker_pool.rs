@@ -10,7 +10,7 @@ use std::time::Duration;
 #[derive(Clone)]
 struct AsyncTestMsg {
     processed: Arc<AtomicUsize>,
-    wg: WaitGroupGuard<()>,
+    _guard: WaitGroupGuard<()>,
 }
 
 /// Async worker implementation for testing
@@ -59,8 +59,8 @@ where
         let wg = WaitGroup::new((), 0);
 
         for _ in 0..msg_count {
-            let guard = wg.add_guard();
-            pool.submit(AsyncTestMsg { processed: processed_count.clone(), wg: guard });
+            let _guard = wg.add_guard();
+            pool.submit(AsyncTestMsg { processed: processed_count.clone(), _guard });
         }
 
         // Wait for all messages to be processed
@@ -129,8 +129,8 @@ where
         while pool.worker_count() <= min_workers && msg_id < max_attempts {
             // Submit a batch of messages
             for _ in 0..10 {
-                let guard = wg.add_guard();
-                pool.submit(AsyncTestMsg { processed: processed_count.clone(), wg: guard });
+                let _guard = wg.add_guard();
+                pool.submit(AsyncTestMsg { processed: processed_count.clone(), _guard });
                 msg_id += 1;
             }
             // Wait a bit for watcher to detect load and spawn workers
