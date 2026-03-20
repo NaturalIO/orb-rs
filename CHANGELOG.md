@@ -15,7 +15,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-## [0.10.0] -2026-03-18
+## [0.11.0] - 2026-03-21
+
+### Added
+
+- AsyncRuntime: Refactor to Add static spawn method.
+
+- Add SmolExec & TokioExec to impl AsyncExec.
+
+## Changed
+
+- AsyncRuntime no longer inherit AsyncExec, instead it as associate type "Exec" of AsyncRuntime.
+
+- Move current()/one()/multi() will return AsyncExec.
+
+- Fix missing self in AsyncExec::spawn_blocking()
+
+- Rename trait AsyncHandle -> AsyncJoiner, ThreadHandle -> ThreadJoiner
+
+### Removed
+
+- orb-smol: Remove new_with_executor() because it does not ensure thread-local set
+
+- AsyncExecDyn is removed, because we can not use static method to spawn.
+
+## [0.10.0] - 2026-03-18
 
 ### Added
 
