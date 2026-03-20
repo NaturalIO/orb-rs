@@ -31,7 +31,7 @@ use std::future::Future;
 ///     }
 /// }
 /// ```
-pub trait AsyncExec: Send + Sync + 'static + Clone {
+pub trait AsyncExec: Send + Sync + 'static + Clone + std::fmt::Debug {
     type AsyncJoiner<R: Send>: AsyncJoiner<R>;
 
     type ThreadJoiner<R: Send>: ThreadJoiner<R> + Send;

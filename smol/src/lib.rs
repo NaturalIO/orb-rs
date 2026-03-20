@@ -136,17 +136,6 @@ impl SmolExec {
     pub fn new_global() -> Self {
         Self(None)
     }
-
-    /// spawn coroutine with specified Executor.
-    ///
-    /// # Safety
-    ///
-    /// You should run block_on on this executor somewhere (self.block_on also counts),
-    /// otherwise the future spawn into this executor will not run.
-    #[inline]
-    pub fn new_with_executor(executor: Arc<Executor<'static>>) -> Self {
-        Self(Some(SmolExecInner { ex: executor, _close_h: None }))
-    }
 }
 
 impl AsyncIO for SmolRT {
@@ -311,7 +300,7 @@ impl AsyncRuntime for SmolRT {
     /// the runtime just init future without scheduling.
     #[inline(always)]
     fn current() -> SmolExec {
-        SmolExec::new_with_executor(Arc::new(Executor::new()))
+        SmolExec(Some(SmolExecInner { ex: Arc::new(Executor::new()), _close_h: None }))
     }
 
     /// Initiate executor with one background thread.
