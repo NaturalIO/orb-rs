@@ -55,6 +55,31 @@ orb-tokio = "0"
 orb-smol = "0"
 ```
 
+```rust
+use orb::AsyncRuntime;
+use orb::runtime::AsyncExec;
+use std::time::Duration;
+
+// Generic function that works with any runtime
+fn run<RT: AsyncRuntime>() {
+    let rt: RT::Exec = RT::multi(2);
+    rt.block_on(async {
+        // Spawn tasks using static methods
+        let handle = RT::spawn(async {
+            RT::sleep(Duration::from_millis(100)).await;
+            42
+        });
+        let result = handle.await.unwrap();
+        println!("Result: {}", result);
+    });
+}
+
+fn main() {
+    // Use with any runtime implementation
+    run::<orb_smol::SmolRT>();
+}
+```
+
 There's a global trait `AsyncRuntime` that combines all features at the crate level, and adding `use orb::prelude::*` will import all the traits you need.
 
 There are some variants of the `new()` function, also refer to the documentation in the sub-crates:

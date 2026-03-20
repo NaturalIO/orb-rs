@@ -21,6 +21,6 @@ pin-project-lite = "0.2"
 futures-lite = "2.6"
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 rand = "0.8"
 async-executor = "1"
+orb-smol = {version="0", path="smol"}
