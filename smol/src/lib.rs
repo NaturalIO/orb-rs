@@ -77,6 +77,7 @@ use orb::AsyncRuntime;
 use orb::io::{AsyncFd, AsyncIO};
 use orb::runtime::{AsyncExec, AsyncJoiner, ThreadJoiner};
 use orb::time::{AsyncTime, TimeInterval};
+use std::cell::Cell;
 use std::fmt;
 use std::future::Future;
 use std::io;
@@ -89,6 +90,7 @@ use std::os::{
 };
 use std::path::Path;
 use std::pin::Pin;
+use std::ptr;
 use std::sync::Arc;
 use std::task::*;
 use std::thread;
@@ -104,6 +106,21 @@ pub struct SmolExec(Option<SmolExecInner>);
 struct SmolExecInner {
     ex: Arc<Executor<'static>>,
     _close_h: Option<CloseHandle<mpmc::Null>>,
+}
+
+// Thread local storage for the current executor context (pointer to Arc<Executor>)
+thread_local! {
+    static CURRENT_EXECUTOR: Cell<*const Executor<'static>> = const { Cell::new(ptr::null()) };
+}
+
+/// Set the current executor context for this thread
+fn set_current_executor(exec: *const Executor<'static>) {
+    CURRENT_EXECUTOR.set(exec);
+}
+
+/// Get the current executor context for this thread
+fn get_current_executor() -> *const Executor<'static> {
+    CURRENT_EXECUTOR.get()
 }
 
 impl fmt::Debug for SmolExec {
@@ -333,12 +350,19 @@ impl AsyncRuntime for SmolRT {
             #[cfg(not(target_os = "espidf"))]
             inner.ex.spawn(async_process::driver()).detach();
             let ex = inner.ex.clone();
+            // Get pointer to the Executor in Arc - this pointer is stable as long as Arc is alive
+            let ex_ptr: usize = Arc::as_ptr(&inner.ex) as usize;
             for n in 1..=size {
                 let _ex = ex.clone();
                 let _rx = rx.clone();
+                let _ex_ptr = ex_ptr;
                 thread::Builder::new()
                     .name(format!("smol-{}", n))
-                    .spawn(move || block_on(_ex.run(_rx.recv())))
+                    .spawn(move || {
+                        set_current_executor(_ex_ptr as *const Executor<'static>);
+                        let _ = block_on(_ex.run(_rx.recv()));
+                        set_current_executor(ptr::null());
+                    })
                     .expect("cannot spawn executor thread");
             }
             SmolExec(Some(inner))
@@ -357,7 +381,10 @@ impl AsyncRuntime for SmolRT {
         }
         #[cfg(not(feature = "global"))]
         {
-            todo!();
+            let ex_ptr = get_current_executor();
+            assert!(!ex_ptr.is_null(), "spawn must be called in runtime worker context");
+            let ex = unsafe { &*ex_ptr };
+            SmolJoinHandle(Some(ex.spawn(unwind_wrap!(f))))
         }
     }
 
@@ -374,7 +401,10 @@ impl AsyncRuntime for SmolRT {
         }
         #[cfg(not(feature = "global"))]
         {
-            todo!();
+            let ex_ptr = get_current_executor();
+            assert!(!ex_ptr.is_null(), "spawn_detach must be called in runtime worker context");
+            let ex = unsafe { &*ex_ptr };
+            ex.spawn(unwind_wrap!(f)).detach();
         }
     }
 
@@ -445,7 +475,11 @@ impl AsyncExec for SmolExec {
         R: 'static,
     {
         if let Some(inner) = &self.0 {
-            block_on(inner.ex.run(f))
+            let ex_ptr: *const Executor<'static> = Arc::as_ptr(&inner.ex);
+            set_current_executor(ex_ptr);
+            let result = block_on(inner.ex.run(f));
+            set_current_executor(ptr::null());
+            result
         } else {
             #[cfg(feature = "global")]
             {
