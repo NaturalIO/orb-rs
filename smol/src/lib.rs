@@ -73,8 +73,9 @@ use async_executor::Executor;
 use async_io::{Async, Timer};
 use crossfire::{MAsyncRx, mpmc, null::CloseHandle};
 use futures_lite::{future::block_on, stream::StreamExt};
+use orb::AsyncRuntime;
 use orb::io::{AsyncFd, AsyncIO};
-use orb::runtime::{AsyncExec, AsyncExecDyn, AsyncHandle, ThreadHandle};
+use orb::runtime::{AsyncExec, AsyncJoiner, ThreadJoiner};
 use orb::time::{AsyncTime, TimeInterval};
 use std::fmt;
 use std::future::Future;
@@ -93,24 +94,26 @@ use std::task::*;
 use std::thread;
 use std::time::{Duration, Instant};
 
+pub struct SmolRT {}
+
 /// The SmolRT implements AsyncRuntime trait
 #[derive(Clone)]
-pub struct SmolRT(Option<SmolRTInner>);
+pub struct SmolExec(Option<SmolExecInner>);
 
 #[derive(Clone)]
-struct SmolRTInner {
+struct SmolExecInner {
     ex: Arc<Executor<'static>>,
     _close_h: Option<CloseHandle<mpmc::Null>>,
 }
 
-impl fmt::Debug for SmolRT {
+impl fmt::Debug for SmolExec {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.0.is_some() { write!(f, "smol") } else { write!(f, "smol(global)") }
     }
 }
 
-impl SmolRT {
+impl SmolExec {
     #[cfg(feature = "global")]
     #[inline]
     pub fn new_global() -> Self {
@@ -125,11 +128,9 @@ impl SmolRT {
     /// otherwise the future spawn into this executor will not run.
     #[inline]
     pub fn new_with_executor(executor: Arc<Executor<'static>>) -> Self {
-        Self(Some(SmolRTInner { ex: executor, _close_h: None }))
+        Self(Some(SmolExecInner { ex: executor, _close_h: None }))
     }
 }
-
-impl orb::AsyncRuntime for SmolRT {}
 
 impl AsyncIO for SmolRT {
     type AsyncFd<T: AsRawFd + AsFd + Send + Sync + 'static> = SmolFD<T>;
@@ -191,7 +192,7 @@ macro_rules! unwind_wrap {
     }};
 }
 
-/// AsyncHandle implementation for smol
+/// AsyncJoiner implementation for smol
 #[cfg(feature = "unwind")]
 pub struct SmolJoinHandle<T>(
     Option<async_executor::Task<Result<T, Box<dyn std::any::Any + Send>>>>,
@@ -199,7 +200,7 @@ pub struct SmolJoinHandle<T>(
 #[cfg(not(feature = "unwind"))]
 pub struct SmolJoinHandle<T>(Option<async_executor::Task<T>>);
 
-impl<T: Send> AsyncHandle<T> for SmolJoinHandle<T> {
+impl<T: Send> AsyncJoiner<T> for SmolJoinHandle<T> {
     #[inline]
     fn is_finished(&self) -> bool {
         self.0.as_ref().unwrap().is_finished()
@@ -260,7 +261,7 @@ impl<T> Drop for SmolJoinHandle<T> {
 
 pub struct BlockingJoinHandle<T>(async_executor::Task<T>);
 
-impl<T> ThreadHandle<T> for BlockingJoinHandle<T> {
+impl<T> ThreadJoiner<T> for BlockingJoinHandle<T> {
     #[inline]
     fn is_finished(&self) -> bool {
         self.0.is_finished()
@@ -280,17 +281,8 @@ impl<T> Future for BlockingJoinHandle<T> {
     }
 }
 
-impl AsyncExecDyn for SmolRT {
-    #[inline(always)]
-    fn spawn_detach_dyn(&self, f: Box<dyn Future<Output = ()> + Send + Unpin>) {
-        self.spawn(unwind_wrap!(f)).detach();
-    }
-}
-
-impl AsyncExec for SmolRT {
-    type AsyncHandle<R: Send> = SmolJoinHandle<R>;
-
-    type ThreadHandle<R: Send> = BlockingJoinHandle<R>;
+impl AsyncRuntime for SmolRT {
+    type Exec = SmolExec;
 
     /// Initiate executor using current thread.
     ///
@@ -301,8 +293,8 @@ impl AsyncExec for SmolRT {
     /// If spawn without a `block_on()` running, it's possible
     /// the runtime just init future without scheduling.
     #[inline(always)]
-    fn current() -> Self {
-        Self::new_with_executor(Arc::new(Executor::new()))
+    fn current() -> SmolExec {
+        SmolExec::new_with_executor(Arc::new(Executor::new()))
     }
 
     /// Initiate executor with one background thread.
@@ -311,7 +303,7 @@ impl AsyncExec for SmolRT {
     ///
     /// [Self::block_on()] is optional.
     #[inline(always)]
-    fn one() -> Self {
+    fn one() -> SmolExec {
         Self::multi(1)
     }
 
@@ -322,7 +314,7 @@ impl AsyncExec for SmolRT {
     /// When `num` == 0, start threads that match cpu number
     /// [Self::block_on()] is optional.
     #[inline(always)]
-    fn multi(mut size: usize) -> Self {
+    fn multi(mut size: usize) -> SmolExec {
         if size == 0 {
             size = usize::from(
                 thread::available_parallelism().unwrap_or(NonZero::new(1usize).unwrap()),
@@ -331,13 +323,13 @@ impl AsyncExec for SmolRT {
         #[cfg(feature = "global")]
         {
             unsafe { std::env::set_var("SMOL_THREADS", size.to_string()) };
-            Self(None)
+            SmolExec::new_global()
         }
         #[cfg(not(feature = "global"))]
         {
             let (close_h, rx): (CloseHandle<mpmc::Null>, MAsyncRx<mpmc::Null>) = mpmc::new();
             // Prevent spawning another thread by running the process driver on this thread.
-            let inner = SmolRTInner { ex: Arc::new(Executor::new()), _close_h: Some(close_h) };
+            let inner = SmolExecInner { ex: Arc::new(Executor::new()), _close_h: Some(close_h) };
             #[cfg(not(target_os = "espidf"))]
             inner.ex.spawn(async_process::driver()).detach();
             let ex = inner.ex.clone();
@@ -349,12 +341,60 @@ impl AsyncExec for SmolRT {
                     .spawn(move || block_on(_ex.run(_rx.recv())))
                     .expect("cannot spawn executor thread");
             }
-            Self(Some(inner))
+            SmolExec(Some(inner))
         }
     }
 
     /// Spawn a task in the background
-    fn spawn<F, R>(&self, f: F) -> Self::AsyncHandle<R>
+    fn spawn<F, R>(f: F) -> SmolJoinHandle<R>
+    where
+        F: Future<Output = R> + Send + 'static,
+        R: Send + 'static,
+    {
+        #[cfg(feature = "global")]
+        {
+            SmolJoinHandle(smol::spawn(f))
+        }
+        #[cfg(not(feature = "global"))]
+        {
+            todo!();
+        }
+    }
+
+    /// Depends on how you initialize SmolRT, spawn with executor or globally
+    #[inline]
+    fn spawn_detach<F, R>(f: F)
+    where
+        F: Future<Output = R> + Send + 'static,
+        R: Send + 'static,
+    {
+        #[cfg(feature = "global")]
+        {
+            smol::spawn(f).detach()
+        }
+        #[cfg(not(feature = "global"))]
+        {
+            todo!();
+        }
+    }
+
+    #[inline]
+    fn spawn_blocking<F, R>(f: F) -> BlockingJoinHandle<R>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        BlockingJoinHandle(blocking::unblock(f))
+    }
+}
+
+impl AsyncExec for SmolExec {
+    type AsyncJoiner<R: Send> = SmolJoinHandle<R>;
+
+    type ThreadJoiner<R: Send> = BlockingJoinHandle<R>;
+
+    /// Spawn a task in the background
+    fn spawn<F, R>(&self, f: F) -> Self::AsyncJoiner<R>
     where
         F: Future<Output = R> + Send + 'static,
         R: Send + 'static,
@@ -386,7 +426,7 @@ impl AsyncExec for SmolRT {
     }
 
     #[inline]
-    fn spawn_blocking<F, R>(f: F) -> Self::ThreadHandle<R>
+    fn spawn_blocking<F, R>(&self, f: F) -> Self::ThreadJoiner<R>
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,

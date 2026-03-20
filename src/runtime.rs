@@ -4,9 +4,8 @@
 //! asynchronous tasks across different runtime implementations.
 
 use std::future::Future;
-use std::sync::Arc;
 
-/// Trait for async runtime execution capabilities.
+/// Trait for async runtime object.
 ///
 /// This trait defines the core execution operations that any async runtime
 /// should provide, including spawning tasks, running futures to completion,
@@ -18,7 +17,7 @@ use std::sync::Arc;
 /// use orb::prelude::*;
 /// use std::future::Future;
 ///
-/// fn example<R: AsyncExec>(runtime: &R) -> impl Future<Output = ()> {
+/// fn example<R: AsyncExec>(rt: &R) -> impl Future<Output = ()> {
 ///     async move {
 ///         // Spawn a task
 ///         let handle = runtime.spawn(async {
@@ -32,35 +31,10 @@ use std::sync::Arc;
 ///     }
 /// }
 /// ```
-pub trait AsyncExec: AsyncExecDyn + Send + Sync + 'static + Clone {
-    type AsyncHandle<R: Send>: AsyncHandle<R>;
+pub trait AsyncExec: Send + Sync + 'static + Clone {
+    type AsyncJoiner<R: Send>: AsyncJoiner<R>;
 
-    type ThreadHandle<R: Send>: ThreadHandle<R> + Send;
-
-    /// Initiate executor using current thread.
-    ///
-    /// # Safety
-    ///
-    /// You should run [Self::block_on()] with this executor.
-    ///
-    /// If spawn without a `block_on()` running, it's possible
-    /// the runtime just init future without scheduling.
-    fn current() -> Self;
-
-    /// Initiate executor with one background thread.
-    ///
-    /// # NOTE
-    ///
-    /// [Self::block_on()] is optional.
-    fn one() -> Self;
-
-    /// Initiate executor with multiple background threads.
-    ///
-    /// # NOTE
-    ///
-    /// When `num` == 0, start threads that match cpu number
-    /// [Self::block_on()] is optional.
-    fn multi(num: usize) -> Self;
+    type ThreadJoiner<R: Send>: ThreadJoiner<R> + Send;
 
     /// Spawn a task in the background, returning a handle to await its result.
     ///
@@ -70,7 +44,7 @@ pub trait AsyncExec: AsyncExecDyn + Send + Sync + 'static + Clone {
     ///
     /// # NOTE:
     ///
-    /// The return AsyncHandle adopts the behavior of tokio.
+    /// The return AsyncJoiner adopts the behavior of tokio.
     ///
     /// The behavior of panic varies for runtimes:
     /// - tokio will capture handle to task result,
@@ -87,10 +61,10 @@ pub trait AsyncExec: AsyncExecDyn + Send + Sync + 'static + Clone {
     ///
     /// # Returns
     ///
-    /// A handle that implements [`AsyncHandle`] and can be used to await
+    /// A handle that implements [`AsyncJoiner`] and can be used to await
     /// the task's result.
     ///
-    fn spawn<F, R>(&self, f: F) -> Self::AsyncHandle<R>
+    fn spawn<F, R>(&self, f: F) -> Self::AsyncJoiner<R>
     where
         F: Future<Output = R> + Send + 'static,
         R: Send + 'static;
@@ -139,9 +113,9 @@ pub trait AsyncExec: AsyncExecDyn + Send + Sync + 'static + Clone {
     ///
     /// # Returns
     ///
-    /// A handle that implements [`ThreadHandle`] and can be used to await
+    /// A handle that implements [`ThreadJoiner`] and can be used to await
     /// the call result.
-    fn spawn_blocking<F, R>(f: F) -> Self::ThreadHandle<R>
+    fn spawn_blocking<F, R>(&self, f: F) -> Self::ThreadJoiner<R>
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static;
@@ -167,38 +141,6 @@ pub trait AsyncExec: AsyncExecDyn + Send + Sync + 'static + Clone {
     where
         F: Future<Output = R> + Send,
         R: 'static;
-
-    fn to_dyn(self) -> Arc<dyn AsyncExecDyn>
-    where
-        Self: Sized,
-    {
-        Arc::new(self)
-    }
-}
-
-pub trait AsyncExecDyn: Send + Sync + 'static {
-    /// Spawn a task and detach it (no handle returned).
-    ///
-    /// This method creates a new task that runs in the background without
-    /// providing a way to wait for its completion. The task will continue
-    /// running until it completes or the program exits.
-    ///
-    /// # NOTE:
-    ///
-    /// The behavior of panic varies for runtimes:
-    /// - tokio will ignore other tasks panic after detached,
-    /// - async-executor (smol) will not capture panic by default, the program will exit. There's a
-    ///   feature switch in [orb-smol](https://docs.rs/orb-smol) to change this behavior.
-    ///
-    /// # Type Parameters
-    ///
-    /// * `F` - The future type to spawn
-    /// * `R` - The return type of the future
-    ///
-    /// # Parameters
-    ///
-    /// * `f` - The future to spawn
-    fn spawn_detach_dyn(&self, f: Box<dyn Future<Output = ()> + Send + Unpin>);
 }
 
 /// A handle for managing spawned async tasks.
@@ -208,7 +150,7 @@ pub trait AsyncExecDyn: Send + Sync + 'static {
 ///
 /// # NOTE:
 ///
-/// The behavior of dropping a AsyncHandle should be detach, we adopt this behavior because
+/// The behavior of dropping a AsyncJoiner should be detach, we adopt this behavior because
 /// user is more familiar with tokio's behavior. We don't want bugs when dropping the task handle unnoticed.
 ///
 /// # Type Parameters
@@ -219,7 +161,7 @@ pub trait AsyncExecDyn: Send + Sync + 'static {
 ///
 /// A future that resolves to `Ok(T)` if the task completed successfully,
 /// or `Err(())` if the task panics.
-pub trait AsyncHandle<T>: Future<Output = Result<T, ()>> + Send + Unpin {
+pub trait AsyncJoiner<T>: Future<Output = Result<T, ()>> + Send + Unpin {
     /// Whether a task can be join immediately
     fn is_finished(&self) -> bool;
 
@@ -246,11 +188,11 @@ pub trait AsyncHandle<T>: Future<Output = Result<T, ()>> + Send + Unpin {
 /// This trait provides methods for waiting for a blocking task's completion or
 /// detaching it to run in the background.
 ///
-/// Calling await on the ThreadHandle will get Result<T, ()>.
+/// Calling await on the ThreadJoiner will get Result<T, ()>.
 ///
 /// # NOTE:
 ///
-/// The behavior of dropping a ThreadHandle will not abort the task (since it run as pthread)
+/// The behavior of dropping a ThreadJoiner will not abort the task (since it run as pthread)
 ///
 /// # Type Parameters
 ///
@@ -260,7 +202,7 @@ pub trait AsyncHandle<T>: Future<Output = Result<T, ()>> + Send + Unpin {
 ///
 /// A future that resolves to `Ok(T)` if the task completed successfully,
 /// or `Err(())` if the task panics.
-pub trait ThreadHandle<T>: Future<Output = Result<T, ()>> {
+pub trait ThreadJoiner<T>: Future<Output = Result<T, ()>> {
     /// Whether a task can be join immediately
     fn is_finished(&self) -> bool;
 }
