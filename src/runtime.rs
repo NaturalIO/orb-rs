@@ -14,21 +14,18 @@ use std::future::Future;
 /// # Example
 ///
 /// ```rust
-/// use orb::prelude::*;
-/// use std::future::Future;
+/// use orb::runtime::AsyncExec;
 ///
-/// fn example<R: AsyncExec>(rt: &R) -> impl Future<Output = ()> {
-///     async move {
-///         // Spawn a task
-///         let handle = runtime.spawn(async {
-///             // Do some async work
-///             42
-///         });
+/// async fn example<R: AsyncExec>(rt: &R) {
+///     // Spawn a task
+///     let handle = rt.spawn(async {
+///         // Do some async work
+///         42
+///     });
 ///
-///         // Wait for the result
-///         let result = handle.await.unwrap();
-///         assert_eq!(result, 42);
-///     }
+///     // Wait for the result
+///     let result = handle.await.unwrap();
+///     assert_eq!(result, 42);
 /// }
 /// ```
 pub trait AsyncExec: Send + Sync + 'static + Clone + std::fmt::Debug {

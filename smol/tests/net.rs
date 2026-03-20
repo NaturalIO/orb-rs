@@ -1,8 +1,7 @@
-use async_executor::Executor;
+use orb::prelude::*;
 use orb_smol::SmolRT;
 use orb_test_utils::{net::*, *};
 use rstest::*;
-use std::sync::Arc;
 
 #[fixture]
 fn setup() {
@@ -12,29 +11,29 @@ fn setup() {
 #[rstest]
 fn test_addr_resolve(setup: ()) {
     let _ = setup; // Explicitly ignore the fixture value
-    let rt = SmolRT::new_with_executor(Arc::new(Executor::new()));
+    let rt = SmolRT::current();
     test_unify_addr_resolve::<SmolRT>(&rt);
 }
 #[rstest]
 #[case(SmolRT::current())]
 #[case(SmolRT::one())]
-#[case(SmolRT::multi(0))]
+#[case(SmolRT::multi(2))]
 #[cfg(feature = "global")]
 #[case(SmolRT::new_global())]
-fn test_tcp(setup: (), #[case] rt: SmolRT) {
+fn test_tcp(setup: (), #[case] rt: SmolExec) {
     let _ = setup; // Explicitly ignore the fixture value
-    test_tcp_client_server(&rt);
-    test_unify_tcp_client_server(&rt);
+    test_tcp_client_server::<SmolRT>(&rt);
+    test_unify_tcp_client_server::<SmolRT>(&rt);
 }
 
 #[rstest]
 #[case(SmolRT::current())]
 #[case(SmolRT::one())]
-#[case(SmolRT::multi(0))]
+#[case(SmolRT::multi(2))]
 #[cfg(feature = "global")]
 #[case(SmolRT::new_global())]
-fn test_unix(setup: (), #[case] rt: SmolRT) {
+fn test_unix(setup: (), #[case] rt: SmolExec) {
     let _ = setup; // Explicitly ignore the fixture value
-    test_unix_client_server(&rt);
-    test_unify_unix_client_server(&rt);
+    test_unix_client_server::<SmolRT>(&rt);
+    test_unify_unix_client_server::<SmolRT>(&rt);
 }

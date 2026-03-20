@@ -4,9 +4,9 @@ use orb::time::TimeInterval;
 use std::time::{Duration, Instant};
 
 #[logfn]
-pub fn test_sleep<RT>(rt: &RT)
+pub fn test_sleep<RT>(rt: &RT::Exec)
 where
-    RT: AsyncRuntime + std::fmt::Debug,
+    RT: AsyncRuntime,
 {
     let start = Instant::now();
     rt.block_on(async {
@@ -17,9 +17,9 @@ where
 }
 
 #[logfn]
-pub fn test_tick<RT>(rt: &RT)
+pub fn test_tick<RT>(rt: &RT::Exec)
 where
-    RT: AsyncRuntime + std::fmt::Debug,
+    RT: AsyncRuntime,
 {
     rt.block_on(async {
         // Test multiple tick instances sequentially
@@ -39,9 +39,9 @@ where
 
 /// Test Stream::next functionality
 #[logfn]
-pub fn test_tick_stream<RT>(rt: &RT)
+pub fn test_tick_stream<RT>(rt: &RT::Exec)
 where
-    RT: AsyncRuntime + std::fmt::Debug,
+    RT: AsyncRuntime,
 {
     rt.block_on(async {
         let start = Instant::now();

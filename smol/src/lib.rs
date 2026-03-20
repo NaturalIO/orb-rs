@@ -41,24 +41,39 @@
 //! assert!(count >= 2 && count <= 4, "{count}");
 //! ```
 //!
+//! ## Static Spawn
 //!
-//! With a custom executor:
+//! This runtime supports static spawn methods through the [`AsyncRuntime`] trait
+//! that use the current runtime context:
 //!
 //! ```rust
-//! use orb_smol::SmolRT;
-//! use orb::prelude::*;
-//! use std::sync::Arc;
-//! use async_executor::Executor;
+//! use orb::AsyncRuntime;
+//! use orb::runtime::AsyncExec;
 //!
-//! let executor = Arc::new(Executor::new());
-//! let rt = SmolRT::new_with_executor(executor);
-//! rt.block_on(async move {
-//!     for _ in 0..3 {
-//!         SmolRT::sleep(std::time::Duration::from_secs(1)).await;
-//!     }
-//!     println!("background task will stop once the block_on is finish");
-//! });
+//! fn example<RT: AsyncRuntime>() {
+//!     let rt = RT::multi(2);
+//!     rt.block_on(async {
+//!         // Spawn a task using the static method - uses current runtime context
+//!         let handle = RT::spawn(async {
+//!             42
+//!         });
+//!         let result = handle.await.unwrap();
+//!         assert_eq!(result, 42);
+//!
+//!         // Spawn and detach a task
+//!         RT::spawn_detach(async {
+//!             println!("detached task running");
+//!         });
+//!     });
+//! }
 //! ```
+//!
+//! The static spawn methods ([`AsyncRuntime::spawn`], [`AsyncRuntime::spawn_detach`]) automatically use
+//! the runtime context of the current thread. This is implemented using thread-local
+//! storage that is registered when entering `block_on` or when worker threads are spawned.
+//!
+//! This feature provides a unified interface across different runtime implementations
+//! (smol, tokio, etc.) and fills the gap in `async-executor`'s native functionality.
 //!
 //! With the smol global thread (requires the `global` feature):
 //!

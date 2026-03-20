@@ -1,6 +1,6 @@
 use orb::prelude::*;
 use orb_test_utils::{runtime::*, time::*, *};
-use orb_tokio::TokioRT;
+use orb_tokio::{TokioExec, TokioRT};
 use rstest::*;
 use std::sync::{
     Arc,
@@ -14,22 +14,23 @@ fn setup() {
 }
 
 #[rstest]
-#[case(TokioRT::new_multi_thread(2))]
-#[case(TokioRT::new_current_thread())]
-fn test_tokio_rt(setup: (), #[case] rt: TokioRT) {
+#[case(TokioRT::current())]
+#[case(TokioRT::multi(2))]
+fn test_tokio_rt(setup: (), #[case] rt: TokioExec) {
     let _ = setup; // Explicitly ignore the fixture value
-    test_spawn_async(&rt);
+    test_spawn_async::<TokioRT>(&rt);
     test_spawn_blocking::<TokioRT>(&rt);
-    test_sleep(&rt);
-    test_tick(&rt);
-    test_tick_stream(&rt);
-    test_boxed_async_handle(&rt);
+    test_sleep::<TokioRT>(&rt);
+    test_tick::<TokioRT>(&rt);
+    test_tick_stream::<TokioRT>(&rt);
+    test_boxed_async_handle::<TokioRT>(&rt);
+    test_static_spawn::<TokioRT>(&rt);
 }
 
 #[rstest]
-#[case(TokioRT::new_multi_thread(2))]
-#[case(TokioRT::new_current_thread())]
-fn test_tokio_rt_panic(setup: (), #[case] rt: TokioRT) {
+#[case(TokioRT::current())]
+#[case(TokioRT::multi(2))]
+fn test_tokio_rt_panic(setup: (), #[case] rt: TokioExec) {
     let _ = setup; // Explicitly ignore the fixture value
     let _rt = rt.clone();
     rt.block_on(async move {

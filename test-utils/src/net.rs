@@ -6,7 +6,10 @@ use std::time::Duration;
 
 /// Test UnifyAddr resolve functionality
 #[logfn]
-pub fn test_unify_addr_resolve<RT: AsyncRuntime + std::fmt::Debug>(rt: &RT) {
+pub fn test_unify_addr_resolve<RT>(rt: &RT::Exec)
+where
+    RT: AsyncRuntime,
+{
     rt.block_on(async {
         use orb::net::UnifyAddr;
         use std::net::{IpAddr, Ipv4Addr};
@@ -53,9 +56,9 @@ pub fn test_unify_addr_resolve<RT: AsyncRuntime + std::fmt::Debug>(rt: &RT) {
 
 /// Test TCP client-server communication
 #[logfn]
-pub fn test_tcp_client_server<RT>(rt: &RT)
+pub fn test_tcp_client_server<RT>(rt: &RT::Exec)
 where
-    RT: AsyncRuntime + std::fmt::Debug,
+    RT: AsyncRuntime,
 {
     rt.block_on(async {
         // Create a shared variable to store the server address
@@ -116,9 +119,9 @@ where
 
 /// Test Unix client-server communication
 #[logfn]
-pub fn test_unix_client_server<RT>(rt: &RT)
+pub fn test_unix_client_server<RT>(rt: &RT::Exec)
 where
-    RT: AsyncRuntime + std::fmt::Debug,
+    RT: AsyncRuntime,
 {
     // Clean up any existing socket file
     let _ = std::fs::remove_file("/tmp/test_socket_client_server");
@@ -180,9 +183,9 @@ where
 
 /// Test UnifyStream and UnifyListener TCP client-server communication
 #[logfn]
-pub fn test_unify_tcp_client_server<RT>(rt: &RT)
+pub fn test_unify_tcp_client_server<RT>(rt: &RT::Exec)
 where
-    RT: AsyncRuntime + std::fmt::Debug,
+    RT: AsyncRuntime,
 {
     rt.block_on(async {
         // Use port 0 to let the OS choose a random available port
@@ -241,9 +244,9 @@ where
 
 /// Test UnifyStream and UnifyListener Unix client-server communication
 #[logfn]
-pub fn test_unify_unix_client_server<RT>(rt: &RT)
+pub fn test_unify_unix_client_server<RT>(rt: &RT::Exec)
 where
-    RT: AsyncRuntime + std::fmt::Debug,
+    RT: AsyncRuntime,
 {
     // Clean up any existing socket file
     let _ = std::fs::remove_file("/tmp/test_unify_socket_client_server");

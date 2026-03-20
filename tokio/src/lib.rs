@@ -11,8 +11,11 @@
 //!
 //! ```rust
 //! use orb_tokio::TokioRT;
+//! use orb::prelude::*;
 //!
-//! let rt = TokioRT::new_multi_thread(4);
+//! type RT = TokioRT;
+//!
+//! let rt = RT::multi(4);
 //! ```
 
 pub use orb::AsyncRuntime;

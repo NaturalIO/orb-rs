@@ -8,13 +8,13 @@ use std::sync::{
 use std::time::{Duration, Instant};
 
 #[logfn]
-pub fn test_spawn_async<RT>(rt: &RT)
+pub fn test_spawn_async<RT>(rt: &RT::Exec)
 where
-    RT: AsyncRuntime + std::fmt::Debug,
+    RT: AsyncRuntime,
 {
     let result = rt.block_on(async move {
         let start_ts = Instant::now();
-        let handle: RT::AsyncHandle<_> = rt.spawn(async {
+        let handle: <RT::Exec as AsyncExec>::AsyncJoiner<_> = rt.spawn(async {
             RT::sleep(Duration::from_secs(3)).await;
             100
         });
@@ -66,11 +66,11 @@ where
 }
 
 #[logfn]
-pub fn test_spawn_blocking<RT: AsyncRuntime + std::fmt::Debug>(rt: &RT) {
+pub fn test_spawn_blocking<RT: AsyncRuntime>(rt: &RT::Exec) {
     let result = rt.block_on(async {
         // test spawn_blocking in the background does not affect foreground
         let start_ts = Instant::now();
-        let handle: RT::ThreadHandle<_> = RT::spawn_blocking(|| {
+        let handle: <RT::Exec as AsyncExec>::ThreadJoiner<_> = RT::spawn_blocking(|| {
             std::thread::sleep(Duration::from_secs(3));
             println!("back ground done");
             42
@@ -128,21 +128,21 @@ pub fn test_spawn_blocking<RT: AsyncRuntime + std::fmt::Debug>(rt: &RT) {
     assert_eq!(result, 1);
 }
 
-/// Test Box<dyn AsyncHandle> functionality including detach, abort, and join
+/// Test Box<dyn AsyncJoiner> functionality including detach, abort, and join
 #[logfn]
-pub fn test_boxed_async_handle<RT>(rt: &RT)
+pub fn test_boxed_async_handle<RT>(rt: &RT::Exec)
 where
-    RT: AsyncRuntime + std::fmt::Debug,
+    RT: AsyncRuntime,
 {
     use std::pin::Pin;
 
     rt.block_on(async {
-        // Test 1: Box<dyn AsyncHandle> with join
-        let handle: RT::AsyncHandle<i32> = rt.spawn(async {
+        // Test 1: Box<dyn AsyncJoiner> with join
+        let handle: <RT::Exec as AsyncExec>::AsyncJoiner<i32> = rt.spawn(async {
             RT::sleep(Duration::from_millis(100)).await;
             42
         });
-        let mut boxed: Box<dyn AsyncHandle<i32>> = Box::new(handle);
+        let mut boxed: Box<dyn AsyncJoiner<i32>> = Box::new(handle);
         assert!(!boxed.is_finished());
         RT::sleep(Duration::from_millis(150)).await;
         assert!(boxed.is_finished());
@@ -151,19 +151,19 @@ where
         let result = pinned.await;
         assert_eq!(result, Ok(42));
 
-        // Test 2: Box<dyn AsyncHandle> with detach
+        // Test 2: Box<dyn AsyncJoiner> with detach
         let counter = Arc::new(AtomicUsize::new(0));
         let exited = Arc::new(AtomicBool::new(false));
         let _exited = exited.clone();
         let _counter = counter.clone();
-        let handle: RT::AsyncHandle<()> = rt.spawn(async move {
+        let handle: <RT::Exec as AsyncExec>::AsyncJoiner<()> = rt.spawn(async move {
             for _ in 0..3 {
                 RT::sleep(Duration::from_millis(100)).await;
                 _counter.fetch_add(1, Ordering::SeqCst);
             }
             _exited.store(true, Ordering::SeqCst);
         });
-        let boxed: Box<dyn AsyncHandle<()>> = Box::new(handle);
+        let boxed: Box<dyn AsyncJoiner<()>> = Box::new(handle);
         RT::sleep(Duration::from_millis(50)).await;
         boxed.detach_boxed();
         while !exited.load(Ordering::SeqCst) {
@@ -171,22 +171,51 @@ where
         }
         assert_eq!(counter.load(Ordering::SeqCst), 3);
 
-        // Test 3: Box<dyn AsyncHandle> with abort
+        // Test 3: Box<dyn AsyncJoiner> with abort
         let counter = Arc::new(AtomicUsize::new(0));
         let _counter = counter.clone();
-        let handle: RT::AsyncHandle<()> = rt.spawn(async move {
+        let handle: <RT::Exec as AsyncExec>::AsyncJoiner<()> = rt.spawn(async move {
             for _ in 0..10 {
                 RT::sleep(Duration::from_millis(100)).await;
                 _counter.fetch_add(1, Ordering::SeqCst);
             }
         });
-        let boxed: Box<dyn AsyncHandle<()>> = Box::new(handle);
+        let boxed: Box<dyn AsyncJoiner<()>> = Box::new(handle);
         RT::sleep(Duration::from_millis(50)).await;
         boxed.abort_boxed();
         RT::sleep(Duration::from_millis(300)).await;
         // Task should have been aborted, counter should be less than 10
         let count = counter.load(Ordering::SeqCst);
         assert!(count < 5, "Task should have been aborted, got count: {}", count);
+
+        42
+    });
+}
+
+/// Test AsyncRuntime::spawn static method
+#[logfn]
+pub fn test_static_spawn<RT>(rt: &RT::Exec)
+where
+    RT: AsyncRuntime,
+{
+    rt.block_on(async {
+        // Test static spawn
+        let handle = RT::spawn(async {
+            RT::sleep(Duration::from_millis(100)).await;
+            42
+        });
+        let result = handle.await.unwrap();
+        assert_eq!(result, 42);
+
+        // Test static spawn_detach
+        let counter = Arc::new(AtomicUsize::new(0));
+        let _counter = counter.clone();
+        RT::spawn_detach(async move {
+            RT::sleep(Duration::from_millis(50)).await;
+            _counter.fetch_add(1, Ordering::SeqCst);
+        });
+        RT::sleep(Duration::from_millis(150)).await;
+        assert_eq!(counter.load(Ordering::SeqCst), 1);
 
         42
     });

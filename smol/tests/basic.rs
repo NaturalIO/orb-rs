@@ -1,4 +1,3 @@
-use async_executor::Executor;
 use orb::prelude::*;
 use orb_smol::SmolRT;
 use orb_test_utils::{runtime::*, time::*, *};
@@ -25,6 +24,7 @@ fn test_smol_global(setup: ()) {
     test_tick(&rt);
     test_tick_stream(&rt);
     test_boxed_async_handle(&rt);
+    test_static_spawn(&rt);
 }
 
 #[rstest]
@@ -79,15 +79,16 @@ fn test_smol_one(setup: ()) {
 }
 
 #[rstest]
-fn test_smol_rt_with_executor(setup: ()) {
+fn test_smol_rt_current(setup: ()) {
     let _ = setup; // Explicitly ignore the fixture value
-    let rt = SmolRT::new_with_executor(Arc::new(Executor::new()));
-    test_spawn_async(&rt);
+    let rt = SmolRT::current();
+    test_spawn_async::<SmolRT>(&rt);
     test_spawn_blocking::<SmolRT>(&rt);
-    test_sleep(&rt);
-    test_tick(&rt);
-    test_tick_stream(&rt);
-    test_boxed_async_handle(&rt);
+    test_sleep::<SmolRT>(&rt);
+    test_tick::<SmolRT>(&rt);
+    test_tick_stream::<SmolRT>(&rt);
+    test_boxed_async_handle::<SmolRT>(&rt);
+    test_static_spawn::<SmolRT>(&rt);
 }
 
 #[cfg(not(feature = "unwind"))]
@@ -95,7 +96,7 @@ fn test_smol_rt_with_executor(setup: ()) {
 #[should_panic]
 fn test_smol_rt_panic(setup: ()) {
     let _ = setup; // Explicitly ignore the fixture value
-    let rt = SmolRT::new_with_executor(Arc::new(Executor::new()));
+    let rt = SmolRT::current();
     let _rt = rt.clone();
     // the panic hook will work, but the program will terminate
     rt.block_on(async move {
@@ -111,7 +112,7 @@ fn test_smol_rt_panic(setup: ()) {
 #[rstest]
 fn test_smol_rt_panic(setup: ()) {
     let _ = setup; // Explicitly ignore the fixture value
-    let rt = SmolRT::new(Arc::new(Executor::new()));
+    let rt = SmolRT::current();
     let _rt = rt.clone();
     // the panic hook will work, but the program will terminate
     rt.block_on(async move {
