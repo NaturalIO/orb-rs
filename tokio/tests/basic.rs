@@ -1,5 +1,5 @@
 use orb::prelude::*;
-use orb_test_utils::{runtime::*, time::*, *};
+use orb_test_utils::{runtime::*, time::*, worker_pool::*, *};
 use orb_tokio::{TokioExec, TokioRT};
 use rstest::*;
 use std::sync::{
@@ -25,6 +25,10 @@ fn test_tokio_rt(setup: (), #[case] rt: TokioExec) {
     test_tick_stream::<TokioRT>(&rt);
     test_boxed_async_handle::<TokioRT>(&rt);
     test_static_spawn::<TokioRT>(&rt);
+    test_unbounded_async_worker_pool_basic::<TokioRT>(&rt);
+    test_unbounded_async_worker_pool_timeout::<TokioRT>(&rt);
+    test_bounded_async_worker_pool_basic::<TokioRT>(&rt);
+    test_bounded_async_worker_pool_timeout::<TokioRT>(&rt);
 }
 
 #[rstest]
