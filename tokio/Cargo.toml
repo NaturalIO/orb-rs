@@ -19,7 +19,8 @@ tokio = { version = "1", features = ["net", "time", "rt", "rt-multi-thread"] }
 orb = { path = "../", version = ">=0.11" }
 
 [dev-dependencies]
-orb-test-utils = { path = "../test-utils" }
+orb-test-utils = { path = "../test-utils", features = ["worker"] }
+orb = { path = "../", version = ">=0.11", features = ["worker"] }
 rstest = "0"
 
 [package.metadata.docs.rs]

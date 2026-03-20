@@ -19,6 +19,11 @@ Orb provides interfaces to adapt different async runtimes like smol and tokio.
 [dependencies]
 pin-project-lite = "0.2"
 futures-lite = "2.6"
+crossfire = { version="3", optional=true}
+
+[features]
+default = []
+worker = ["dep:crossfire"]
 
 [dev-dependencies]
 fastrand = "2.3"

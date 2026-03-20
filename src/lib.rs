@@ -41,6 +41,8 @@ pub mod net;
 pub mod runtime;
 pub mod time;
 pub mod utils;
+#[cfg(feature = "worker")]
+pub mod worker_pool;
 
 /// Re-export all the traits you need
 ///

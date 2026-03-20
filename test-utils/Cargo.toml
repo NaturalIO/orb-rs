@@ -16,3 +16,8 @@ orb = { path = "../", version = ">=0.1" }
 log = { version = "0.4", features = ["std", "kv_unstable"] }
 captains-log = ">=0.15"
 futures-lite = "2.6"
+crossfire = { version = "3", optional = true }
+
+[features]
+default = []
+worker = ["orb/worker", "dep:crossfire"]

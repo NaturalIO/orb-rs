@@ -1,6 +1,6 @@
 use orb::prelude::*;
 use orb_smol::{SmolExec, SmolRT};
-use orb_test_utils::{runtime::*, time::*, *};
+use orb_test_utils::{runtime::*, time::*, worker_pool::*, *};
 use rstest::*;
 use std::sync::{
     Arc,
@@ -26,6 +26,8 @@ fn test_smol_rt(setup: (), #[case] rt: SmolExec) {
     test_tick_stream::<SmolRT>(&rt);
     test_boxed_async_handle::<SmolRT>(&rt);
     test_static_spawn::<SmolRT>(&rt);
+    test_unbounded_async_worker_pool_basic::<SmolRT>(&rt);
+    test_unbounded_async_worker_pool_timeout::<SmolRT>(&rt);
 }
 
 #[rstest]
