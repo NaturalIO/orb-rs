@@ -18,5 +18,8 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
+    - name: clippy
+      run: cargo clippy -- -D warnings
+
     - name: test-all
       run: make test
