@@ -13,9 +13,16 @@ Orb 是一个用于编写运行时无关的异步 Rust 代码的抽象层，允�
     - 行为更符合 tokio 的使用习惯，避免因为实际 runtime 行为差异造成的bug (比如， drop 一个 AsyncJoinHandle 默认是 detach 而不是 cancel.)
 - 可扩展：易于实现对新运行时的支持, 无须改动 orb 仓库本身
 - 网络功能：
-    - 提供了额外的统一类型抽象，如 (tcp + unix) `UnifyListener` / `UnifyStream`
-    - 通过 `ResolveAddr` trait 提供非阻塞域名解析
+    - 提供 [AsyncFd](https://docs.rs/orb/latest/orb/io/trait.AsyncFd.html) 抽象
+    - 提供了额外的统一类型抽象，如 (tcp + unix) [UnifyListener](https://docs.rs/orb/latest/orb/net/struct.UnixListener.html) / [UnifyStream](https://docs.rs/orb/latest/orb/net/enum.UnifyStream.html)
+    - 通过 [ResolveAddr](https://docs.rs/orb/latest/orb/net/trait.ResolveAddr.html) trait 提供非阻塞域名解析
+- Worker Pool（需要 `worker` 特性）： 同时支持 async 和线程消息处理, 支持静态和动态扩容
+    - `WorkerPoolUnbounded` - 无界消息队列
+    - `WorkerPoolBounded` - 有界消息队列
 
+- 实现:
+    - [orb-tokio](https://docs.rs/orb-tokio)
+    - [orb-smol](https://docs.rs/orb-smol)
 
 ## 开发目标
 
@@ -48,13 +55,32 @@ orb-tokio = "0"
 orb-smol = "0"
 ```
 
-在 crate 级别有一个全局 trait `AsyncRuntime` 组合了所有功能，添加 `use orb::prelude::*` 将导入您需要的所有 trait。
-
-`new()` 函数有一些变体，也请参考子 crate 中的文档：
+在 crate 级别有一个全局 trait [AsyncRuntime](https://docs.rs/orb/latest/orb/trait.AsyncRuntime.html) 组合了所有功能，添加 `use orb::prelude::*` 将导入您需要的所有 trait。 包括：
+[`AsyncExec`](https://docs.rs/orb/latest/orb/runtime/trait.AsyncExec.html), [`AsyncIO`](https://docs.rs/orb/latest/orb/io/trait.AsyncIO.html), [`AsyncTime`](https://docs.rs/orb/latest/orb/time/trait.AsyncTime.html).
 
 - [orb-tokio](https://crates.io/crates/orb-tokio) - 适用于 Tokio 运行时
 - [orb-smol](https://crates.io/crates/orb-smol) - 适用于 Smol 运行时
 
-## 许可证
+```rust
+use orb::prelude::*;
+use std::time::Duration;
 
-本项目采用 MIT 许可证 - 详情请见 LICENSE 文件。
+// Generic function that works with any runtime
+fn run<RT: AsyncRuntime>() {
+    let rt: RT::Exec = RT::multi(2);
+    rt.block_on(async {
+        // Spawn tasks using static methods
+        let handle = RT::spawn(async {
+            RT::sleep(Duration::from_millis(100)).await;
+            42
+        });
+        let result = handle.await.unwrap();
+        println!("Result: {}", result);
+    });
+}
+
+fn main() {
+    // Use with any runtime implementation
+    run::<orb_smol::SmolRT>();
+}
+```

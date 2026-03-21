@@ -14,9 +14,17 @@ We took the name `Orb` because it gets around :)
 - Runtime Agnostic: Write code that works with multiple async runtimes
     - The hehavior of this crate is more aligned to tokio, to prevent unnotice bugs (for example, dropping a task handle means detach by default)
 - Extensible: Easy to implement support for new runtimes as plugin, without modification to the main crate.
-- networking:
-    - Provide unify abstraction (tcp + unix) as `UnifyListener` / `UnifyStream`
-    - Non-blocking name resolving: via `ResolveAddr` trait
+- Networking:
+    - Provide [AsyncFd](https://docs.rs/orb/latest/orb/io/trait.AsyncFd.html) abstraction.
+    - Provide unify abstraction (tcp + unix) as [UnifyListener](https://docs.rs/orb/latest/orb/net/struct.UnixListener.html) / [UnifyStream](https://docs.rs/orb/latest/orb/net/enum.UnifyStream.html).
+    - Non-blocking name resolving: via [ResolveAddr](https://docs.rs/orb/latest/orb/net/trait.ResolveAddr.html) trait.
+- [Worker Pool](https://docs.rs/orb/latest/orb/worker_pool/index.html) (requires `worker` feature): Support thread based and async, auto scalling
+    - `WorkerPoolUnbounded` - Submit message with unbounded channel.
+    - `WorkerPoolBounded` - Submit message with bounded channel
+
+- Implementation:
+    - [orb-tokio](https://docs.rs/orb-tokio)
+    - [orb-smol](https://docs.rs/orb-smol)
 
 ## The goal
 
@@ -55,9 +63,11 @@ orb-tokio = "0"
 orb-smol = "0"
 ```
 
+There's a global trait [AsyncRuntime](https://docs.rs/orb/latest/orb/trait.AsyncRuntime.html) that combines all features at the crate level, and adding `use orb::prelude::*` will import all the traits you need, including [`AsyncExec`](https://docs.rs/orb/latest/orb/runtime/trait.AsyncExec.html), [`AsyncIO`](https://docs.rs/orb/latest/orb/io/trait.AsyncIO.html), and [`AsyncTime`](https://docs.rs/orb/latest/orb/time/trait.AsyncTime.html).
+
+
 ```rust
-use orb::AsyncRuntime;
-use orb::runtime::AsyncExec;
+use orb::prelude::*;
 use std::time::Duration;
 
 // Generic function that works with any runtime
@@ -79,14 +89,3 @@ fn main() {
     run::<orb_smol::SmolRT>();
 }
 ```
-
-There's a global trait `AsyncRuntime` that combines all features at the crate level, and adding `use orb::prelude::*` will import all the traits you need.
-
-There are some variants of the `new()` function, also refer to the documentation in the sub-crates:
-
-- [orb-tokio](https://docs.rs/orb-tokio) - For the Tokio runtime
-- [orb-smol](https://docs.rs/orb-smol) - For the Smol runtime
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.

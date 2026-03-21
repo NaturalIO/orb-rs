@@ -2,17 +2,6 @@
 #![cfg_attr(docsrs, allow(unused_attributes))]
 #![doc = include_str!("../README.md")]
 
-//! ## Modules
-//!
-//! - [`runtime`] - Traits for task spawn, join and block_on.
-//! - [`io`] - Traits for asynchronous I/O operations, and buffered I/O wrapper.
-//! - [`net`] - Wrapper types for networking, and a "unify" type for tcp + unix stream.
-//! - [`time`] - Traits for time-related operations like sleeping and intervals
-//! - [`utils`] - Utility types and functions
-//!
-//! At top level [AsyncRuntime] trait will combine all the capabilities, including
-//! [`AsyncExec`], [`AsyncIO`], and [`AsyncTime`].
-//!
 //! ## Runtime Varieties Note
 //!
 //! ### Task Detach
