@@ -1,5 +1,5 @@
 [workspace]
-members = ["tokio", "smol", "test-utils"]
+members = ["tokio", "smol", "compio", "test-utils"]
 
 [package]
 name = "orb"
