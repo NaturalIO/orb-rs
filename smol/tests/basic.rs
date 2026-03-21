@@ -1,5 +1,5 @@
 use orb::prelude::*;
-use orb_smol::SmolRT;
+use orb_smol::{SmolExec, SmolRT};
 use orb_test_utils::{runtime::*, time::*, *};
 use rstest::*;
 use std::sync::{
@@ -13,22 +13,23 @@ fn setup() {
     init_logger();
 }
 
-#[cfg(feature = "global")]
 #[rstest]
-fn test_smol_global(setup: ()) {
+#[case(SmolRT::current())]
+#[case(SmolRT::one())]
+#[case(SmolRT::multi(0))]
+fn test_smol_rt(setup: (), #[case] rt: SmolExec) {
     let _ = setup; // Explicitly ignore the fixture value
-    let rt = SmolRT::new_global();
-    test_spawn_async(&rt);
+    test_spawn_async::<SmolRT>(&rt);
     test_spawn_blocking::<SmolRT>(&rt);
-    test_sleep(&rt);
-    test_tick(&rt);
-    test_tick_stream(&rt);
-    test_boxed_async_handle(&rt);
-    test_static_spawn(&rt);
+    test_sleep::<SmolRT>(&rt);
+    test_tick::<SmolRT>(&rt);
+    test_tick_stream::<SmolRT>(&rt);
+    test_boxed_async_handle::<SmolRT>(&rt);
+    test_static_spawn::<SmolRT>(&rt);
 }
 
 #[rstest]
-fn test_smol_current(setup: ()) {
+fn test_smol_current_blockon(setup: ()) {
     let _ = setup;
     println!("test blockon effect");
     let counter = Arc::new(AtomicUsize::new(0));
@@ -54,7 +55,7 @@ fn test_smol_current(setup: ()) {
 }
 
 #[rstest]
-fn test_smol_one(setup: ()) {
+fn test_smol_one_blockon(setup: ()) {
     let _ = setup;
     let rt = SmolRT::one();
     let counter = Arc::new(AtomicUsize::new(0));
@@ -76,19 +77,6 @@ fn test_smol_one(setup: ()) {
     }
     rx_count = counter.load(Ordering::SeqCst);
     assert!(rx_count >= 6 && rx_count <= 9, "{rx_count}");
-}
-
-#[rstest]
-fn test_smol_rt_current(setup: ()) {
-    let _ = setup; // Explicitly ignore the fixture value
-    let rt = SmolRT::current();
-    test_spawn_async::<SmolRT>(&rt);
-    test_spawn_blocking::<SmolRT>(&rt);
-    test_sleep::<SmolRT>(&rt);
-    test_tick::<SmolRT>(&rt);
-    test_tick_stream::<SmolRT>(&rt);
-    test_boxed_async_handle::<SmolRT>(&rt);
-    test_static_spawn::<SmolRT>(&rt);
 }
 
 #[cfg(not(feature = "unwind"))]

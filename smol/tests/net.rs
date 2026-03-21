@@ -1,5 +1,5 @@
 use orb::prelude::*;
-use orb_smol::SmolRT;
+use orb_smol::{SmolExec, SmolRT};
 use orb_test_utils::{net::*, *};
 use rstest::*;
 
@@ -18,8 +18,6 @@ fn test_addr_resolve(setup: ()) {
 #[case(SmolRT::current())]
 #[case(SmolRT::one())]
 #[case(SmolRT::multi(2))]
-#[cfg(feature = "global")]
-#[case(SmolRT::new_global())]
 fn test_tcp(setup: (), #[case] rt: SmolExec) {
     let _ = setup; // Explicitly ignore the fixture value
     test_tcp_client_server::<SmolRT>(&rt);
@@ -30,8 +28,6 @@ fn test_tcp(setup: (), #[case] rt: SmolExec) {
 #[case(SmolRT::current())]
 #[case(SmolRT::one())]
 #[case(SmolRT::multi(2))]
-#[cfg(feature = "global")]
-#[case(SmolRT::new_global())]
 fn test_unix(setup: (), #[case] rt: SmolExec) {
     let _ = setup; // Explicitly ignore the fixture value
     test_unix_client_server::<SmolRT>(&rt);

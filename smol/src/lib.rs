@@ -10,8 +10,8 @@
 //! ## Features
 //!
 //! - `global`: Enables the global executor feature, which allows using `smol` default global executor
-//!   instead of providing your own executor instance. (by default not enabled, omit the `smol`
-//!   dependency)
+//!   which require polling in smol dependency, and requires setting
+//!   (by default not enabled, our `SmolRT::multi()` is more convenient)
 //!
 //! - `unwind`: Use AssertUnwindSafe to capture panic inside the task, and return Err(()) to the
 //! task join handle. (by default not enabled, panic terminates the program)
@@ -74,15 +74,6 @@
 //!
 //! This feature provides a unified interface across different runtime implementations
 //! (smol, tokio, etc.) and fills the gap in `async-executor`'s native functionality.
-//!
-//! With the smol global thread (requires the `global` feature):
-//!
-//! ```rust
-//! use orb_smol::SmolRT;
-//!
-//! #[cfg(feature = "global")]
-//! let rt = SmolRT::new_global();
-//! ```
 
 use async_executor::Executor;
 use async_io::{Async, Timer};
@@ -144,14 +135,6 @@ impl fmt::Debug for SmolExec {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.0.is_some() { write!(f, "smol") } else { write!(f, "smol(global)") }
-    }
-}
-
-impl SmolExec {
-    #[cfg(feature = "global")]
-    #[inline]
-    pub fn new_global() -> Self {
-        Self(None)
     }
 }
 
@@ -347,7 +330,7 @@ impl AsyncRuntime for SmolRT {
         #[cfg(feature = "global")]
         {
             unsafe { std::env::set_var("SMOL_THREADS", size.to_string()) };
-            SmolExec::new_global()
+            SmolExec(None)
         }
         #[cfg(not(feature = "global"))]
         {
@@ -384,7 +367,7 @@ impl AsyncRuntime for SmolRT {
     {
         #[cfg(feature = "global")]
         {
-            SmolJoinHandle(Some(smol::spawn(f)))
+            SmolJoinHandle(Some(smol::spawn(unwind_wrap!(f))))
         }
         #[cfg(not(feature = "global"))]
         {
