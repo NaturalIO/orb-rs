@@ -6,6 +6,95 @@ use crossfire::{
 };
 use std::{sync::Arc, thread, time::Duration};
 
+/// A bounded worker pool that uses a fixed-size channel for message submission.
+///
+/// Unlike [`WorkerPoolUnbounded`](super::WorkerPoolUnbounded), this pool uses a bounded channel
+/// with a fixed capacity. When the channel is full, subsequent submissions will block (for async)
+/// or timeout and trigger dynamic scaling (when min_workers < max_workers).
+///
+/// This pool supports both async and blocking workers. It maintains a minimum number of
+/// workers and can scale up to a maximum when needed. Workers that are idle for the
+/// specified timeout will automatically exit until only the minimum remains.
+///
+/// # Type Parameters
+///
+/// * `M` - The message type that workers will process. Must be `Send + Sized + Unpin + 'static`.
+///
+/// # Examples
+///
+/// ## Blocking Worker
+///
+/// Use blocking workers for CPU-bound or blocking operations:
+///
+/// ```rust
+/// use orb::worker_pool::{WorkerBlocking, WorkerPoolBounded};
+/// use std::time::Duration;
+///
+/// #[derive(Clone)]
+/// struct MyBlockingWorker;
+///
+/// #[derive(Clone)]
+/// struct MyMsg {
+///     value: u32,
+/// }
+///
+/// impl WorkerBlocking for MyBlockingWorker {
+///     type Msg = MyMsg;
+///
+///     fn run(&self, msg: Self::Msg) {
+///         println!("Processing: {}", msg.value);
+///     }
+/// }
+///
+/// let worker = MyBlockingWorker;
+/// // Create a pool with channel bound of 100, 2-8 workers, 5s timeout
+/// let pool = WorkerPoolBounded::new_blocking(100, worker, 2, 8, Duration::from_secs(5));
+///
+/// for i in 0..100 {
+///     pool.submit(MyMsg { value: i });
+/// }
+///
+/// // Try to submit without blocking
+/// if let Err(msg) = pool.try_submit(MyMsg { value: 101 }) {
+///     println!("Queue full, message dropped");
+/// }
+/// ```
+///
+/// ## Async Worker
+///
+/// Use async workers for I/O-bound operations within an async runtime:
+///
+/// ```rust
+/// use orb::worker_pool::{WorkerAsync, WorkerPoolBounded};
+/// use orb::AsyncRuntime;
+/// use std::time::Duration;
+///
+/// #[derive(Clone)]
+/// struct MyAsyncWorker;
+///
+/// #[derive(Clone)]
+/// struct MyMsg {
+///     value: u32,
+/// }
+///
+/// impl WorkerAsync for MyAsyncWorker {
+///     type Msg = MyMsg;
+///
+///     async fn run(&self, msg: Self::Msg) {
+///         println!("Processing: {}", msg.value);
+///     }
+/// }
+///
+/// # fn example<RT: AsyncRuntime>() {
+/// let worker = MyAsyncWorker;
+/// // Create a pool with channel bound of 100, 2-8 workers, 5s timeout
+/// let pool = WorkerPoolBounded::new_async::<_, RT>(100, worker, None, 2, 8, Duration::from_secs(5));
+///
+/// for i in 0..100 {
+///     pool.submit(MyMsg { value: i });
+/// }
+/// # }
+/// ```
 #[derive(Clone)]
 pub struct WorkerPoolBounded<M>
 where
@@ -24,7 +113,14 @@ where
 {
     /// Submits a message to the worker pool for processing.
     ///
-    /// This method is non-blocking and will queue the message for the next available worker.
+    /// This method will queue the message for the next available worker.
+    /// If the channel is full and `min_workers < max_workers`, this method will:
+    /// 1. Wait up to 1 second for space to become available
+    /// 2. If timed out, notify the watcher to spawn additional workers
+    /// 3. Block until the message can be sent
+    ///
+    /// For non-blocking submission, use [`try_submit`](Self::try_submit).
+    /// For async submission, use [`submit_async`](Self::submit_async).
     #[inline]
     pub fn submit(&self, msg: M) {
         if self.auto {
@@ -39,6 +135,17 @@ where
         }
     }
 
+    /// Submits a message asynchronously to the worker pool for processing.
+    ///
+    /// This method is similar to [`submit`](Self::submit) but for use in async contexts.
+    /// If the channel is full and `min_workers < max_workers`, this method will:
+    /// 1. Wait up to 1 second for space to become available
+    /// 2. If timed out, notify the watcher to spawn additional workers
+    /// 3. Await until the message can be sent
+    ///
+    /// # Type Parameters
+    ///
+    /// * `RT` - The async runtime type implementing [`AsyncRuntime`].
     #[inline]
     pub async fn submit_async<RT: AsyncRuntime>(&self, msg: M) {
         if self.auto {
@@ -55,6 +162,33 @@ where
         }
     }
 
+    /// Attempts to submit a message without blocking.
+    ///
+    /// Returns `Ok(())` if the message was successfully queued,
+    /// or `Err(msg)` if the channel is full.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use orb::worker_pool::{WorkerBlocking, WorkerPoolBounded};
+    /// use std::time::Duration;
+    ///
+    /// # #[derive(Clone)]
+    /// # struct MyWorker;
+    /// # #[derive(Clone)]
+    /// # struct MyMsg;
+    /// # impl WorkerBlocking for MyWorker {
+    /// #     type Msg = MyMsg;
+    /// #     fn run(&self, _msg: Self::Msg) {}
+    /// # }
+    /// # let worker = MyWorker;
+    /// # let pool = WorkerPoolBounded::new_blocking(10, worker, 1, 1, Duration::from_secs(1));
+    /// // Try to submit without blocking
+    /// match pool.try_submit(MyMsg) {
+    ///     Ok(()) => println!("Message queued successfully"),
+    ///     Err(_) => println!("Queue full, try again later"),
+    /// }
+    /// ```
     #[inline]
     pub fn try_submit(&self, msg: M) -> Result<(), M> {
         match self.tx.try_send(msg) {
@@ -149,6 +283,11 @@ where
         Self { tx, tx_async, inner, noti_tx, auto }
     }
 
+    /// Returns the current number of active workers.
+    ///
+    /// This count includes both minimum workers and any dynamically spawned workers
+    /// that are still active (not yet timed out).
+    #[inline]
     pub fn worker_count(&self) -> usize {
         self.inner.worker_count()
     }
