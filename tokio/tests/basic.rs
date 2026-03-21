@@ -27,6 +27,10 @@ fn test_tokio_rt(setup: (), #[case] rt: TokioExec) {
     test_static_spawn::<TokioRT>(&rt);
     test_unbounded_async_worker_pool_basic::<TokioRT>(&rt);
     test_unbounded_async_worker_pool_timeout::<TokioRT>(&rt);
+    test_bounded_async_worker_pool_basic::<TokioRT>(&rt);
+    test_bounded_async_worker_pool_timeout::<TokioRT>(&rt);
+    test_bounded_async_worker_pool_try_submit::<TokioRT>(&rt);
+    test_bounded_async_worker_pool_submit_async::<TokioRT>(&rt);
 }
 
 #[rstest]
