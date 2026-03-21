@@ -86,6 +86,7 @@
 
 use async_executor::Executor;
 use async_io::{Async, Timer};
+#[allow(unused_imports)]
 use crossfire::{MAsyncRx, mpmc, null::CloseHandle};
 use futures_lite::{future::block_on, stream::StreamExt};
 use orb::AsyncRuntime;
@@ -133,6 +134,7 @@ fn set_current_executor(exec: *const Executor<'static>) {
     CURRENT_EXECUTOR.set(exec);
 }
 
+#[cfg(not(feature = "global"))]
 /// Get the current executor context for this thread
 fn get_current_executor() -> *const Executor<'static> {
     CURRENT_EXECUTOR.get()
@@ -309,7 +311,7 @@ impl AsyncRuntime for SmolRT {
     ///
     /// # Safety
     ///
-    /// You should run [Self::block_on()] with this executor.
+    /// You should run [AsyncExec::block_on()] with this executor.
     ///
     /// If spawn without a `block_on()` running, it's possible
     /// the runtime just init future without scheduling.
@@ -322,7 +324,7 @@ impl AsyncRuntime for SmolRT {
     ///
     /// # NOTE
     ///
-    /// [Self::block_on()] is optional.
+    /// [AsyncExec::block_on()] is optional, you can directly call [AsyncExec::spawn] with it.
     #[inline(always)]
     fn one() -> SmolExec {
         Self::multi(1)
@@ -333,7 +335,8 @@ impl AsyncRuntime for SmolRT {
     /// # NOTE
     ///
     /// When `num` == 0, start threads that match cpu number
-    /// [Self::block_on()] is optional.
+    ///
+    /// [AsyncExec::block_on()] is optional, you can directly call [AsyncExec::spawn] with it.
     #[inline(always)]
     fn multi(mut size: usize) -> SmolExec {
         if size == 0 {
@@ -381,7 +384,7 @@ impl AsyncRuntime for SmolRT {
     {
         #[cfg(feature = "global")]
         {
-            SmolJoinHandle(smol::spawn(f))
+            SmolJoinHandle(Some(smol::spawn(f)))
         }
         #[cfg(not(feature = "global"))]
         {
