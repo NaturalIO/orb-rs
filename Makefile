@@ -27,6 +27,7 @@ test-smol: init
 	cargo check -p orb-smol
 	echo "run smol"
 	cargo test -p orb-smol ${ARGS} -- --nocapture --test-threads=1
+	cargo test -p orb-smol ${ARGS} --all-features -- --nocapture --test-threads=1
 	#echo "run smol with -F global"
 	#cargo test -p orb-smol ${ARGS} -F global -- --nocapture --test-threads=1
 	#cargo test -p orb-smol panic -F unwind -- --nocapture --test-threads=1
@@ -35,6 +36,7 @@ test-smol: init
 build: init
 	cargo build -p orb-tokio
 	cargo build -p orb-smol
+	cargo build -p orb-smol --all-features
 	cargo build
 
 .DEFAULT_GOAL = build
