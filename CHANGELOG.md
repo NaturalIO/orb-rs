@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.11.1] - 2026-03-21
+
+### Fixed
+
+- orb-smol: Fix global flag broken in 0.11.0
+
+### Removed
+
+- orb-smol: Remove SmolExec::new_global(), should use SmolRT::multi() instead.
+
 ## [0.11.0] - 2026-03-21
 
 ### Added
