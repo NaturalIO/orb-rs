@@ -14,9 +14,13 @@ We took the name `Orb` because it gets around :)
 - Runtime Agnostic: Write code that works with multiple async runtimes
     - The hehavior of this crate is more aligned to tokio, to prevent unnotice bugs (for example, dropping a task handle means detach by default)
 - Extensible: Easy to implement support for new runtimes as plugin, without modification to the main crate.
-- networking:
-    - Provide unify abstraction (tcp + unix) as `UnifyListener` / `UnifyStream`
-    - Non-blocking name resolving: via `ResolveAddr` trait
+- Networking:
+    - Provide AsyncFd abstraction.
+    - Provide unify abstraction (tcp + unix) as `UnifyListener` / `UnifyStream`.
+    - Non-blocking name resolving: via `ResolveAddr` trait.
+- Worker Pool (requires `worker` feature): Support thread based and async, auto scalling
+    - `WorkerPoolUnbounded` - Submit message with unbounded channel.
+    - `WorkerPoolBounded` - Submit message with bounded channel
 
 ## The goal
 
@@ -42,6 +46,8 @@ This is why this crate was written.
 ## Usage
 
 To use Orb, you need to depend on both the core `orb` crate and a runtime adapter crate like `orb-tokio` or `orb-smol`.
+
+There's a global trait `AsyncRuntime` that combines all features at the crate level, and adding `use orb::prelude::*` will import all the traits you need.
 
 In your `Cargo.toml`:
 
@@ -79,11 +85,6 @@ fn main() {
     run::<orb_smol::SmolRT>();
 }
 ```
-
-There's a global trait `AsyncRuntime` that combines all features at the crate level, and adding `use orb::prelude::*` will import all the traits you need.
-
-There are some variants of the `new()` function, also refer to the documentation in the sub-crates:
-
 - [orb-tokio](https://docs.rs/orb-tokio) - For the Tokio runtime
 - [orb-smol](https://docs.rs/orb-smol) - For the Smol runtime
 

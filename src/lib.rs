@@ -9,6 +9,7 @@
 //! - [`net`] - Wrapper types for networking, and a "unify" type for tcp + unix stream.
 //! - [`time`] - Traits for time-related operations like sleeping and intervals
 //! - [`utils`] - Utility types and functions
+//! - [`worker_pool`] - Worker pool implementations for message processing (requires `worker` feature)
 //!
 //! At top level [AsyncRuntime] trait will combine all the capabilities, including
 //! [`AsyncExec`], [`AsyncIO`], and [`AsyncTime`].
