@@ -26,10 +26,16 @@
 //! - smol will not issolate panic. Although a panic hook will work, the program might panic if one
 //! of the task panic. You may use feature `unwind` to enable panic capturing.
 //!
-//! ### Cloning
+//! ### thread local context
 //!
-//! Since [AsyncExec] cannot know the runtime type within thread-local context, we have impl Clone
-//! for AsyncExec. It's common practice to Clone the runtime instance and pass it through `block_on`.
+//! When the first time enter block_on in `current()` runtime, or threaded worker spawn,
+//! we have maintain thread local ref for the runtime, so that you can use [AsyncRuntime::spawn()] static method directly.
+//! (Note that calling `AsyncRuntime::spawn()` from non-async context will panic (just like `tokio::spawn` behavior)
+//!
+//! ## Cloning the runtime
+//!
+//! [AsyncExec] is a cloneable runtime handle, can be initiated by [AsyncRuntime::current()], [AsyncRuntime::one()], [AsyncRuntime::multi()]
+
 pub mod io;
 pub mod net;
 pub mod runtime;
