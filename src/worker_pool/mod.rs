@@ -1,7 +1,7 @@
-//pub mod bounded;
+mod bounded;
 mod unbounded;
-
 use crate::prelude::*;
+pub use bounded::WorkerPoolBounded;
 pub use unbounded::WorkerPoolUnbounded;
 
 use crossfire::{AsyncRxTrait, BlockingRxTrait};
@@ -42,18 +42,27 @@ struct WorkerPoolInner {
     min_workers: usize,
     max_workers: usize,
     timeout: Duration,
+    max_cpu: usize,
+    bind_cpu: AtomicUsize,
 }
 
 impl WorkerPoolInner {
     #[inline(always)]
-    fn new(min_workers: usize, max_workers: usize, mut timeout: Duration) -> Arc<Self> {
+    fn new(mut timeout: Duration, min_workers: usize, max_workers: usize) -> Arc<Self> {
         assert!(min_workers > 0);
         assert!(max_workers >= min_workers);
         if timeout == ZERO_DUR {
             timeout = Duration::from_secs(2);
         }
-
-        Arc::new(Self { count: AtomicUsize::new(0), min_workers, max_workers, timeout })
+        Arc::new(Self {
+            count: AtomicUsize::new(0),
+            min_workers,
+            max_workers,
+            timeout,
+            // TODO bind_cpu param
+            max_cpu: 0,
+            bind_cpu: AtomicUsize::new(0),
+        })
     }
 
     #[inline(always)]
@@ -139,7 +148,16 @@ impl WorkerPoolInner {
         W: WorkerBlocking,
         RX: BlockingRxTrait<W::Msg> + Clone,
     {
+        let _bind_cpu: Option<usize> = if self.max_cpu > 0 {
+            let cpu = self.bind_cpu.fetch_add(1, Ordering::Relaxed);
+            Some(cpu % self.max_cpu)
+        } else {
+            None
+        };
         std::thread::spawn(move || {
+            //            if let Some(cpu) = bind_cpu {
+            //                core_affinity::set_for_current(core_affinity::CoreId { id: cpu });
+            //            }
             self.run_blocking_worker(worker, auto, rx);
         });
     }

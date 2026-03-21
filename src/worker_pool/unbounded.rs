@@ -130,7 +130,7 @@ where
         W: WorkerAsync<Msg = M>,
         RT: AsyncRuntime,
     {
-        let inner = WorkerPoolInner::new(min_workers, max_workers, timeout);
+        let inner = WorkerPoolInner::new(timeout, min_workers, max_workers);
         let (tx, rx) = mpmc::unbounded_async::<M>();
         let (close_h, close_rx) = mpsc::new();
         WorkerPoolInner::init_async::<W, RT, _>(&inner, rt.as_ref(), &worker, &rx);
@@ -171,7 +171,7 @@ where
     where
         W: WorkerBlocking<Msg = M>,
     {
-        let inner = WorkerPoolInner::new(min_workers, max_workers, timeout);
+        let inner = WorkerPoolInner::new(timeout, min_workers, max_workers);
         let (tx, rx) = mpmc::unbounded_blocking::<M>();
         let (close_h, close_rx) = mpsc::new();
         WorkerPoolInner::init_blocking::<W, _>(&inner, &worker, &rx);
