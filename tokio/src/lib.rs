@@ -95,7 +95,7 @@ impl AsyncRuntime for TokioRT {
     ///
     /// # Safety
     ///
-    /// You should run [Self::block_on()] with this executor.
+    /// You should run [AsyncExec::block_on()] with this executor.
     ///
     /// If spawn without a `block_on()` running, it's possible
     /// the runtime just init future without scheduling.
@@ -107,7 +107,7 @@ impl AsyncRuntime for TokioRT {
     ///
     /// # NOTE
     ///
-    /// [Self::block_on()] is optional.
+    /// [AsyncExec::block_on()] is optional, you can directly call [AsyncExec::spawn] with it.
     #[inline(always)]
     fn one() -> Self::Exec {
         TokioExec::new_multi_thread(1)
@@ -117,8 +117,9 @@ impl AsyncRuntime for TokioRT {
     ///
     /// # NOTE
     ///
-    /// When `num` == 0, start threads that match cpu number
-    /// [Self::block_on()] is optional.
+    /// When `num` == 0, start threads that match cpu number.
+    ///
+    /// [AsyncExec::block_on()] is optional, you can directly call [AsyncExec::spawn] with it.
     #[inline(always)]
     fn multi(num: usize) -> Self::Exec {
         TokioExec::new_multi_thread(num)
