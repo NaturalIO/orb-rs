@@ -15,29 +15,27 @@ fmt: init
 
 .PHONY: test
 test: test-tokio test-smol
-	cargo test -- --nocapture --test-threads=1
+	cargo test --all-features -- --nocapture --test-threads=1
 
 .PHONY: test-tokio
 test-tokio: init
 	cargo check -p orb-tokio
-	cargo test -p orb-tokio ${ARGS} -- --nocapture --test-threads=1
+	cargo test -p orb-tokio ${ARGS} --all-features -- --nocapture --test-threads=1
 
 .PHONY: test-smol
 test-smol: init
 	cargo check -p orb-smol
 	echo "run smol"
 	cargo test -p orb-smol ${ARGS} -- --nocapture --test-threads=1
-	cargo test -p orb-smol ${ARGS} --all-features -- --nocapture --test-threads=1
 	#echo "run smol with -F global"
-	#cargo test -p orb-smol ${ARGS} -F global -- --nocapture --test-threads=1
-	#cargo test -p orb-smol panic -F unwind -- --nocapture --test-threads=1
+	cargo test -p orb-smol ${ARGS} --all-features -- --nocapture --test-threads=1
 
 .PHONY: build
 build: init
 	cargo build -p orb-tokio
 	cargo build -p orb-smol
 	cargo build -p orb-smol --all-features
-	cargo build
+	cargo build --all-features
 
 .DEFAULT_GOAL = build
 
