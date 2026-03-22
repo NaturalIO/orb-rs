@@ -3,7 +3,7 @@ members = ["tokio", "smol", "test-utils"]
 
 [package]
 name = "orb"
-version = "0.12.0"
+version = "0.12.1"
 edition = "2024"
 authors = ["plan <frostyplanet@gmail.com>"]
 categories = ["concurrency", "network-programming"]
@@ -42,4 +42,7 @@ len_without_is_empty = "allow"
 [lints]
 workspace=true
 
-
+[package.metadata.docs.rs]
+all-features = true
+# enable features in the documentation
+rustdoc-args = ["--cfg", "docsrs"]

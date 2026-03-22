@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.12.1] - 2026-03-22
+
+### Added
+
+- worker_pool: Add scalable bounded/unbound worker pools which support async & blocking (under `worker` feature)
+
 ## [0.11.1] - 2026-03-21
 
 ### Fixed
